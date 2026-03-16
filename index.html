@@ -158,20 +158,20 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="area_boundaries.js"></script>
   <script>
-    // AREA_MUNICIPALITIES loaded from area_boundaries.js
-    // Each area has an array of {name, coords} municipality polygons
+    // AREA_BOUNDARIES loaded from area_boundaries.js
+    // Each area has a polygon (array of [lat,lon]) or MultiPolygon (array of arrays)
 
-    // Helper: check if coords represent a MultiPolygon
-    function isMultiPolygon(coords) {
-      return Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+    // Helper: check if boundary is a MultiPolygon (array of polygons)
+    function isMultiPolygon(boundary) {
+      return Array.isArray(boundary[0]) && Array.isArray(boundary[0][0]);
     }
 
-    // Check if point is inside a municipality's coords (handles both Polygon and MultiPolygon)
-    function pointInMuniCoords(point, coords) {
-      if (isMultiPolygon(coords)) {
-        return coords.some(ring => pointInPolygon(point, ring));
+    // Check if point is inside boundary (handles both Polygon and MultiPolygon)
+    function pointInBoundary(point, boundary) {
+      if (isMultiPolygon(boundary)) {
+        return boundary.some(ring => pointInPolygon(point, ring));
       }
-      return pointInPolygon(point, coords);
+      return pointInPolygon(point, boundary);
     }
 
     const AREA_COLORS = {
@@ -212,12 +212,12 @@
       if (!s) return;
       s.visible = visible;
       if (visible) {
-        s.polygons.forEach(p => p.addTo(map));
+        if (s.polygon) s.polygon.addTo(map);
         s.markers.forEach(m => m.marker.addTo(map));
         if (showLocationLabels) s.labels.forEach(l => l.addTo(map));
         if (showAreaLabels && s.areaLabel) s.areaLabel.addTo(map);
       } else {
-        s.polygons.forEach(p => map.removeLayer(p));
+        if (s.polygon) map.removeLayer(s.polygon);
         s.markers.forEach(m => map.removeLayer(m.marker));
         s.labels.forEach(l => map.removeLayer(l));
         if (s.areaLabel) map.removeLayer(s.areaLabel);
@@ -271,12 +271,12 @@
           byArea[loc.area].push(loc);
         }
 
-        // Check each location against the municipality polygons of its assigned area
+        // Check each location against its area's boundary polygon
         const issues = [];
         for (const loc of locs) {
-          const munis = AREA_MUNICIPALITIES[loc.area];
-          if (munis && munis.length > 0) {
-            const inside = munis.some(m => pointInMuniCoords([loc.lat, loc.lon], m.coords));
+          const boundary = AREA_BOUNDARIES[loc.area];
+          if (boundary) {
+            const inside = pointInBoundary([loc.lat, loc.lon], boundary);
             if (!inside) {
               loc.issue = true;
               issues.push(loc);
@@ -286,30 +286,24 @@
 
         appData = { locs, issues, byArea };
 
-        // Draw individual municipality polygons per area
-        for (const [area, munis] of Object.entries(AREA_MUNICIPALITIES)) {
+        // Draw area boundary polygons
+        for (const [area, boundary] of Object.entries(AREA_BOUNDARIES)) {
           const color = AREA_COLORS[area] || '#888';
           const areaLocs = byArea[area] || [];
-          const state = { visible: true, markers: [], labels: [], polygons: [], areaLabel: null };
+          const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
 
-          // Draw each municipality polygon separately
-          const allBounds = L.latLngBounds();
-          for (const muni of munis) {
-            const poly = L.polygon(muni.coords, {
-              color, fillColor: color, fillOpacity: 0.12, weight: 2, dashArray: '6, 3'
-            }).addTo(map);
-            poly.bindTooltip(muni.name, { sticky: true, className: 'location-label' });
-            state.polygons.push(poly);
-            allBounds.extend(poly.getBounds());
-          }
+          // Draw the area polygon (handles both simple and multi-polygon)
+          const poly = L.polygon(boundary, {
+            color, fillColor: color, fillOpacity: 0.12, weight: 2, dashArray: '6, 3'
+          }).addTo(map);
+          poly.bindTooltip(area, { sticky: true, className: 'location-label' });
+          state.polygon = poly;
 
-          // Area label at center of all municipality bounds
-          if (allBounds.isValid()) {
-            const center = allBounds.getCenter();
-            state.areaLabel = L.marker(center, {
-              icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
-            }).addTo(map);
-          }
+          // Area label at polygon center
+          const center = poly.getBounds().getCenter();
+          state.areaLabel = L.marker(center, {
+            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
+          }).addTo(map);
 
           // Location markers
           for (const loc of areaLocs) {
@@ -389,10 +383,8 @@
               item.classList.remove('hidden-area');
               toggleArea(a, true);
             }
-            if (s.polygons.length) {
-              const bounds = L.latLngBounds();
-              s.polygons.forEach(p => bounds.extend(p.getBounds()));
-              map.fitBounds(bounds, { padding: [50, 50] });
+            if (s.polygon) {
+              map.fitBounds(s.polygon.getBounds(), { padding: [50, 50] });
             }
           });
           legendItems.appendChild(item);
