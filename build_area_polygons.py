@@ -3,11 +3,15 @@
 Build area polygon boundaries from municipality GeoJSON files.
 For each area in locations.json, finds which municipality polygons contain
 the area's locations, then merges those polygons into a single boundary.
+
+Key rule: each municipality is assigned to exactly ONE area (the one with
+the most locations inside it) to prevent overlapping borders.
 """
 
 import json
 import os
 import glob
+from collections import defaultdict
 from shapely.geometry import shape, Point, MultiPolygon, Polygon
 from shapely.ops import unary_union
 
@@ -49,7 +53,6 @@ def find_municipality_for_point(lat, lon, municipalities):
     for muni in municipalities:
         if muni["geometry"].contains(point):
             return muni
-    # If no exact match, find nearest
     return None
 
 
@@ -59,11 +62,9 @@ def polygon_to_leaflet_coords(geom, simplify_tolerance=0.002):
         geom = geom.simplify(simplify_tolerance, preserve_topology=True)
 
     if isinstance(geom, Polygon):
-        # Single polygon - return array of [lat, lon] pairs
         coords = list(geom.exterior.coords)
         return [[round(lat, 6), round(lon, 6)] for lon, lat in coords]
     elif isinstance(geom, MultiPolygon):
-        # Multi polygon - return array of arrays
         result = []
         for poly in geom.geoms:
             coords = list(poly.exterior.coords)
@@ -79,7 +80,6 @@ def main():
         data = json.load(f)
     locations = data["locations"]
 
-    # Group locations by area
     by_area = {}
     for loc in locations:
         area = loc["area"]
@@ -93,32 +93,58 @@ def main():
     municipalities = load_all_municipalities()
     print(f"Loaded {len(municipalities)} municipality polygons")
 
-    # For each area, find which municipalities contain its locations
-    area_municipalities = {}  # area -> set of municipality geometries
+    # Step 1: For each location, find its municipality
+    # Track: municipality -> {area: count} to resolve conflicts
+    muni_area_counts = defaultdict(lambda: defaultdict(int))
+    muni_geometries = {}  # muni_name -> geometry
     unmatched_locs = []
 
-    for area, locs in by_area.items():
-        area_munis = {}  # muni_name -> geometry
-        for loc in locs:
-            muni = find_municipality_for_point(loc["lat"], loc["lon"], municipalities)
-            if muni:
-                key = muni["name_heb"]
-                if key not in area_munis:
-                    area_munis[key] = muni["geometry"]
-            else:
-                unmatched_locs.append(loc)
-        area_municipalities[area] = area_munis
-        print(f"  {area}: {len(locs)} locations -> {len(area_munis)} municipalities: {', '.join(area_munis.keys())}")
+    for loc in locations:
+        muni = find_municipality_for_point(loc["lat"], loc["lon"], municipalities)
+        if muni:
+            name = muni["name_heb"]
+            muni_area_counts[name][loc["area"]] += 1
+            muni_geometries[name] = muni["geometry"]
+        else:
+            unmatched_locs.append(loc)
 
     if unmatched_locs:
         print(f"\n  {len(unmatched_locs)} locations not matched to any municipality:")
         for loc in unmatched_locs:
             print(f"    - {loc['name']} ({loc['area']}) at {loc['lat']}, {loc['lon']}")
 
-    # Merge municipality polygons per area
+    # Step 2: Assign each municipality to exactly ONE area (majority vote)
+    muni_to_area = {}
+    conflicts = []
+    for muni_name, area_counts in muni_area_counts.items():
+        if len(area_counts) > 1:
+            conflicts.append((muni_name, dict(area_counts)))
+        # Assign to area with most locations
+        winner = max(area_counts, key=area_counts.get)
+        muni_to_area[muni_name] = winner
+
+    if conflicts:
+        print(f"\n  {len(conflicts)} municipalities claimed by multiple areas (resolved by majority):")
+        for muni_name, counts in conflicts:
+            winner = muni_to_area[muni_name]
+            parts = ', '.join(f'{a}({c})' for a, c in sorted(counts.items(), key=lambda x: -x[1]))
+            print(f"    {muni_name}: {parts} -> assigned to {winner}")
+
+    # Step 3: Group municipalities by their assigned area
+    area_municipalities = defaultdict(dict)
+    for muni_name, area in muni_to_area.items():
+        area_municipalities[area][muni_name] = muni_geometries[muni_name]
+
+    print("\nArea municipality assignments:")
+    for area in by_area:
+        munis = area_municipalities.get(area, {})
+        print(f"  {area}: {len(munis)} municipalities: {', '.join(munis.keys())}")
+
+    # Step 4: Merge municipality polygons per area
     print("\nMerging polygons per area...")
     area_boundaries = {}
-    for area, munis in area_municipalities.items():
+    for area in by_area:
+        munis = area_municipalities.get(area, {})
         if not munis:
             print(f"  {area}: No municipalities matched, skipping")
             continue
@@ -126,26 +152,23 @@ def main():
         geometries = list(munis.values())
         merged = unary_union(geometries)
 
-        # Make sure result is valid
         if not merged.is_valid:
             merged = merged.buffer(0)
 
-        # Simplify more aggressively: ~0.003 degrees ≈ ~300m, good visual quality
         leaflet_coords = polygon_to_leaflet_coords(merged, simplify_tolerance=0.003)
         area_boundaries[area] = leaflet_coords
 
-        # Count total points
         if isinstance(leaflet_coords[0][0], list):
             total_pts = sum(len(ring) for ring in leaflet_coords)
         else:
             total_pts = len(leaflet_coords)
 
         if isinstance(merged, MultiPolygon):
-            print(f"  {area}: Merged {len(munis)} municipalities -> MultiPolygon with {len(merged.geoms)} parts, {total_pts} points")
+            print(f"  {area}: {len(munis)} municipalities -> MultiPolygon with {len(merged.geoms)} parts, {total_pts} points")
         else:
-            print(f"  {area}: Merged {len(munis)} municipalities -> Polygon, {total_pts} points")
+            print(f"  {area}: {len(munis)} municipalities -> Polygon, {total_pts} points")
 
-    # Output as compact JavaScript (no indent to save space)
+    # Output as compact JavaScript
     print("\nGenerating JavaScript...")
     js_output = "const AREA_BOUNDARIES = "
     js_output += json.dumps(area_boundaries, ensure_ascii=False, separators=(',', ':'))
@@ -155,12 +178,6 @@ def main():
     with open(output_file, 'w') as f:
         f.write(js_output)
     print(f"Written to {output_file}")
-
-    # Also print for easy copy
-    print("\n" + "=" * 60)
-    print("AREA_BOUNDARIES for index.html:")
-    print("=" * 60)
-    print(js_output)
 
 
 if __name__ == "__main__":
