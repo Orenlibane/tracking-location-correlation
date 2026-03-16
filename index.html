@@ -11,7 +11,7 @@
     #app { display: flex; height: 100vh; }
     #map { flex: 1; z-index: 1; }
     #sidebar {
-      width: 320px; background: #16213e; overflow-y: auto;
+      width: 340px; background: #16213e; overflow-y: auto;
       padding: 16px; border-left: 2px solid #0f3460;
       display: flex; flex-direction: column; gap: 12px;
     }
@@ -26,16 +26,38 @@
     .legend h3 { font-size: 14px; margin-bottom: 8px; color: #53a8b6; }
     .legend-item {
       display: flex; align-items: center; gap: 8px;
-      padding: 4px 0; font-size: 12px; cursor: pointer;
+      padding: 5px 0; font-size: 12px; cursor: pointer;
       transition: opacity 0.2s;
     }
     .legend-item:hover { opacity: 0.7; }
+    .legend-item.hidden-area { opacity: 0.3; }
+    .legend-checkbox {
+      width: 16px; height: 16px; border-radius: 3px;
+      border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; cursor: pointer;
+    }
+    .legend-checkbox.checked::after { content: '✓'; }
     .legend-dot {
       width: 14px; height: 14px; border-radius: 50%;
       border: 2px solid rgba(255,255,255,0.3);
       flex-shrink: 0;
     }
-    .legend-count { color: #888; margin-right: auto; font-size: 11px; }
+    .legend-name { flex: 1; }
+    .legend-count { color: #888; font-size: 11px; }
+    .legend-zoom {
+      background: none; border: 1px solid #334; color: #8ac0ff;
+      font-size: 10px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
+    }
+    .legend-zoom:hover { background: #1a2a4a; }
+    .legend-controls {
+      display: flex; gap: 6px; margin-bottom: 6px;
+    }
+    .legend-controls button {
+      flex: 1; background: #1a1a2e; border: 1px solid #334; color: #aaa;
+      padding: 4px 0; font-size: 11px; cursor: pointer; border-radius: 4px;
+    }
+    .legend-controls button:hover { background: #222; color: #eee; }
     .issues { background: #0f3460; padding: 10px; border-radius: 8px; }
     .issues h3 { font-size: 14px; margin-bottom: 8px; color: #e94560; }
     .issue-item {
@@ -51,6 +73,23 @@
     }
     .search-box:focus { outline: none; border-color: #e94560; }
     .search-box::placeholder { color: #555; }
+    /* Labels toggle */
+    .toggle-row {
+      display: flex; align-items: center; gap: 8px;
+      background: #0f3460; padding: 8px 10px; border-radius: 8px;
+      font-size: 12px;
+    }
+    .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
+    .toggle-row input[type="checkbox"] { accent-color: #e94560; }
+    /* WhatsApp share button */
+    .share-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #25D366; color: #fff; border: none;
+      padding: 10px; border-radius: 8px; font-size: 14px;
+      font-weight: bold; cursor: pointer; transition: background 0.2s;
+    }
+    .share-btn:hover { background: #1da851; }
+    .share-btn svg { width: 20px; height: 20px; fill: #fff; }
     /* Custom Leaflet popup */
     .leaflet-popup-content-wrapper { background: #16213e; color: #eee; border-radius: 8px; }
     .leaflet-popup-tip { background: #16213e; }
@@ -59,6 +98,21 @@
     .popup-status { font-size: 12px; margin-top: 4px; font-weight: bold; }
     .popup-status.ok { color: #4caf50; }
     .popup-status.bad { color: #e94560; }
+    /* Map labels */
+    .location-label {
+      background: none !important; border: none !important;
+      box-shadow: none !important;
+      font-size: 10px; color: #ccc; font-weight: bold;
+      text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+      white-space: nowrap;
+    }
+    .area-label {
+      background: none !important; border: none !important;
+      box-shadow: none !important;
+      font-size: 14px; color: #fff; font-weight: bold;
+      text-shadow: 2px 2px 4px #000, -1px -1px 3px #000;
+      white-space: nowrap; opacity: 0.8;
+    }
   </style>
 </head>
 <body>
@@ -73,19 +127,31 @@
         <div><div class="stat-val" id="ok-count">0</div><div class="stat-label">תקינים</div></div>
         <div><div class="stat-val" id="issue-count" style="color:#e94560">0</div><div class="stat-label">חריגים</div></div>
       </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="toggle-labels"> הצג שמות מיקומים</label>
+        <label><input type="checkbox" id="toggle-area-labels" checked> שמות אזורים</label>
+      </div>
       <div class="legend" id="legend">
         <h3>אזורים</h3>
+        <div class="legend-controls">
+          <button id="show-all-areas">הצג הכל</button>
+          <button id="hide-all-areas">הסתר הכל</button>
+        </div>
+        <div id="legend-items"></div>
       </div>
       <div class="issues" id="issues-panel">
         <h3>🔴 מיקומים חריגים</h3>
         <div id="issues-list"></div>
       </div>
+      <button class="share-btn" id="share-whatsapp">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        שתף ב-WhatsApp
+      </button>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Area colors
     const AREA_COLORS = {
       'תל אביב': '#ff6b6b',
       'ירושלים': '#ffd93d',
@@ -98,26 +164,22 @@
       'אשדוד': '#00c9a7'
     };
 
-    // Initialize map centered on Israel
-    const map = L.map('map', {
-      center: [31.5, 34.85],
-      zoom: 8,
-      zoomControl: true
-    });
+    const map = L.map('map', { center: [31.5, 34.85], zoom: 8, zoomControl: true });
 
-    // Use CartoDB dark tile layer for sleek look
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CartoDB',
-      maxZoom: 19
+      attribution: '© OpenStreetMap © CartoDB', maxZoom: 19
     }).addTo(map);
 
-    // Layer groups per area
-    const areaLayers = {};
-    const areaPolygons = {};
-    const markers = [];
+    // State
+    const areaState = {};   // { area: { visible, markers[], polygon, labels[], areaLabel } }
+    const allMarkers = [];
     let issueMarkers = [];
+    let allLabels = [];
+    let allAreaLabels = [];
+    let showLocationLabels = false;
+    let showAreaLabels = true;
+    let appData = null;
 
-    // Compute convex hull (Graham scan)
     function convexHull(points) {
       if (points.length < 3) return points;
       function cross(O, A, B) {
@@ -126,43 +188,97 @@
       points = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
       const lower = [];
       for (const p of points) {
-        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
-          lower.pop();
+        while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
         lower.push(p);
       }
       const upper = [];
       for (const p of points.reverse()) {
-        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
-          upper.pop();
+        while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
         upper.push(p);
       }
-      upper.pop();
-      lower.pop();
+      upper.pop(); lower.pop();
       return lower.concat(upper);
     }
 
-    // Point in polygon test (ray casting)
     function pointInPolygon(point, polygon) {
       let inside = false;
       const [x, y] = point;
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const [xi, yi] = polygon[i];
-        const [xj, yj] = polygon[j];
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-          inside = !inside;
-        }
+        const [xi, yi] = polygon[i], [xj, yj] = polygon[j];
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
       }
       return inside;
     }
 
-    // Expand polygon slightly for tolerance
     function expandPolygon(polygon, factor = 0.05) {
       const cx = polygon.reduce((s, p) => s + p[0], 0) / polygon.length;
       const cy = polygon.reduce((s, p) => s + p[1], 0) / polygon.length;
-      return polygon.map(([x, y]) => [
-        cx + (x - cx) * (1 + factor),
-        cy + (y - cy) * (1 + factor)
-      ]);
+      return polygon.map(([x, y]) => [cx + (x - cx) * (1 + factor), cy + (y - cy) * (1 + factor)]);
+    }
+
+    function toggleArea(area, visible) {
+      const s = areaState[area];
+      if (!s) return;
+      s.visible = visible;
+      if (visible) {
+        if (s.polygon) s.polygon.addTo(map);
+        s.markers.forEach(m => m.marker.addTo(map));
+        if (showLocationLabels) s.labels.forEach(l => l.addTo(map));
+        if (showAreaLabels && s.areaLabel) s.areaLabel.addTo(map);
+      } else {
+        if (s.polygon) map.removeLayer(s.polygon);
+        s.markers.forEach(m => map.removeLayer(m.marker));
+        s.labels.forEach(l => map.removeLayer(l));
+        if (s.areaLabel) map.removeLayer(s.areaLabel);
+      }
+    }
+
+    function updateLocationLabels() {
+      for (const [area, s] of Object.entries(areaState)) {
+        if (s.visible && showLocationLabels) {
+          s.labels.forEach(l => l.addTo(map));
+        } else {
+          s.labels.forEach(l => map.removeLayer(l));
+        }
+      }
+    }
+
+    function updateAreaLabels() {
+      for (const [area, s] of Object.entries(areaState)) {
+        if (s.visible && showAreaLabels && s.areaLabel) {
+          s.areaLabel.addTo(map);
+        } else if (s.areaLabel) {
+          map.removeLayer(s.areaLabel);
+        }
+      }
+    }
+
+    // Build summary text for WhatsApp
+    function buildShareText() {
+      if (!appData) return '';
+      const { locs, issues, byArea } = appData;
+      let text = `🗺️ *Map Tracker - סיכום*\n\n`;
+      text += `📍 סה"כ מיקומים: ${locs.length}\n`;
+      text += `🟢 תקינים: ${locs.length - issues.length}\n`;
+      text += `🔴 חריגים: ${issues.length}\n\n`;
+      text += `*אזורים:*\n`;
+      for (const [area, areaLocs] of Object.entries(byArea)) {
+        const areaIssues = areaLocs.filter(l => l.issue).length;
+        text += `• ${area}: ${areaLocs.length} מיקומים`;
+        if (areaIssues > 0) text += ` (${areaIssues} חריגים)`;
+        text += `\n`;
+      }
+      if (issues.length > 0) {
+        text += `\n*מיקומים חריגים:*\n`;
+        for (const loc of issues) {
+          text += `🔴 ${loc.name} (${loc.area})\n`;
+        }
+      }
+      // Add link to deployed app if available
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        text += `\n🔗 ${window.location.href}`;
+      }
+      return text;
     }
 
     // Load data and render
@@ -170,111 +286,157 @@
       .then(r => r.json())
       .then(data => {
         const locs = data.locations;
-
-        // Group by area
         const byArea = {};
         for (const loc of locs) {
           if (!byArea[loc.area]) byArea[loc.area] = [];
           byArea[loc.area].push(loc);
         }
 
-        // Build convex hulls per area
         const hulls = {};
         for (const [area, areaLocs] of Object.entries(byArea)) {
           const pts = areaLocs.map(l => [l.lat, l.lon]);
-          if (pts.length >= 3) {
-            hulls[area] = convexHull(pts);
-          } else {
-            hulls[area] = pts;
-          }
+          hulls[area] = pts.length >= 3 ? convexHull(pts) : pts;
         }
 
-        // Expanded hulls for tolerance check
         const expandedHulls = {};
         for (const [area, hull] of Object.entries(hulls)) {
           expandedHulls[area] = hull.length >= 3 ? expandPolygon(hull, 0.08) : hull;
         }
 
-        // Determine issues: check if each location falls within its area's expanded hull
         const issues = [];
         for (const loc of locs) {
           const hull = expandedHulls[loc.area];
-          if (hull && hull.length >= 3) {
-            if (!pointInPolygon([loc.lat, loc.lon], hull)) {
-              loc.issue = true;
-              issues.push(loc);
-            }
+          if (hull && hull.length >= 3 && !pointInPolygon([loc.lat, loc.lon], hull)) {
+            loc.issue = true;
+            issues.push(loc);
           }
         }
 
-        // Draw area polygons (outlines)
-        for (const [area, hull] of Object.entries(hulls)) {
-          if (hull.length < 3) continue;
+        appData = { locs, issues, byArea };
+
+        // Create layers per area
+        for (const [area, areaLocs] of Object.entries(byArea)) {
           const color = AREA_COLORS[area] || '#888';
-          const polygon = L.polygon(hull, {
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.08,
-            weight: 2,
-            dashArray: '6, 4'
+          const hull = hulls[area];
+          const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
+
+          // Polygon outline
+          if (hull.length >= 3) {
+            state.polygon = L.polygon(hull, {
+              color, fillColor: color, fillOpacity: 0.08, weight: 2, dashArray: '6, 4'
+            }).addTo(map);
+          }
+
+          // Area label at centroid
+          const cx = areaLocs.reduce((s, l) => s + l.lat, 0) / areaLocs.length;
+          const cy = areaLocs.reduce((s, l) => s + l.lon, 0) / areaLocs.length;
+          state.areaLabel = L.marker([cx, cy], {
+            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [100, 20], iconAnchor: [50, 10] })
           }).addTo(map);
-          polygon.bindTooltip(area, { permanent: false, direction: 'center', className: '' });
-          areaPolygons[area] = polygon;
+          allAreaLabels.push(state.areaLabel);
+
+          // Location markers + labels
+          for (const loc of areaLocs) {
+            const mColor = loc.issue ? '#e94560' : color;
+            const radius = loc.issue ? 7 : 5;
+
+            const circle = L.circleMarker([loc.lat, loc.lon], {
+              radius, fillColor: mColor, color: loc.issue ? '#fff' : mColor,
+              weight: loc.issue ? 2 : 1, fillOpacity: loc.issue ? 1 : 0.8
+            }).addTo(map);
+
+            const statusClass = loc.issue ? 'bad' : 'ok';
+            const statusText = loc.issue ? '⚠️ חריג - לא נמצא באזור המוגדר' : '✓ תקין';
+            circle.bindPopup(`
+              <div class="popup-title">${loc.name}</div>
+              <div class="popup-area">אזור: ${loc.area}</div>
+              <div class="popup-status ${statusClass}">${statusText}</div>
+            `);
+
+            state.markers.push({ marker: circle, loc });
+            allMarkers.push({ marker: circle, loc });
+            if (loc.issue) issueMarkers.push({ marker: circle, loc });
+
+            // Location label (hidden by default)
+            const label = L.marker([loc.lat, loc.lon], {
+              icon: L.divIcon({
+                className: 'location-label',
+                html: loc.name,
+                iconSize: [80, 14],
+                iconAnchor: [40, -6]
+              })
+            });
+            state.labels.push(label);
+            allLabels.push(label);
+          }
+
+          areaState[area] = state;
         }
 
-        // Draw location markers
-        for (const loc of locs) {
-          const color = loc.issue ? '#e94560' : (AREA_COLORS[loc.area] || '#888');
-          const radius = loc.issue ? 7 : 5;
-
-          const circle = L.circleMarker([loc.lat, loc.lon], {
-            radius: radius,
-            fillColor: color,
-            color: loc.issue ? '#fff' : color,
-            weight: loc.issue ? 2 : 1,
-            fillOpacity: loc.issue ? 1 : 0.8
-          }).addTo(map);
-
-          const statusClass = loc.issue ? 'bad' : 'ok';
-          const statusText = loc.issue ? '⚠️ חריג - לא נמצא באזור המוגדר' : '✓ תקין';
-
-          circle.bindPopup(`
-            <div class="popup-title">${loc.name}</div>
-            <div class="popup-area">אזור: ${loc.area}</div>
-            <div class="popup-status ${statusClass}">${statusText}</div>
-          `);
-
-          markers.push({ marker: circle, loc });
-          if (loc.issue) issueMarkers.push({ marker: circle, loc });
-        }
-
-        // Update stats
+        // Stats
         document.getElementById('total-count').textContent = locs.length;
         document.getElementById('area-count').textContent = Object.keys(byArea).length;
         document.getElementById('ok-count').textContent = locs.length - issues.length;
         document.getElementById('issue-count').textContent = issues.length;
 
-        // Build legend
-        const legendEl = document.getElementById('legend');
+        // Legend with checkboxes
+        const legendItems = document.getElementById('legend-items');
         for (const [area, areaLocs] of Object.entries(byArea)) {
           const color = AREA_COLORS[area] || '#888';
           const item = document.createElement('div');
           item.className = 'legend-item';
           item.innerHTML = `
+            <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${area}"></span>
             <span class="legend-dot" style="background:${color}"></span>
-            <span>${area}</span>
+            <span class="legend-name">${area}</span>
             <span class="legend-count">${areaLocs.length}</span>
+            <button class="legend-zoom" data-area="${area}" title="זום לאזור">⊕</button>
           `;
-          item.addEventListener('click', () => {
-            // Zoom to area
-            if (areaPolygons[area]) {
-              map.fitBounds(areaPolygons[area].getBounds(), { padding: [50, 50] });
-            }
+
+          // Checkbox toggle
+          item.querySelector('.legend-checkbox').addEventListener('click', (e) => {
+            const cb = e.target;
+            const a = cb.dataset.area;
+            const isChecked = cb.classList.toggle('checked');
+            item.classList.toggle('hidden-area', !isChecked);
+            toggleArea(a, isChecked);
           });
-          legendEl.appendChild(item);
+
+          // Zoom button
+          item.querySelector('.legend-zoom').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const a = e.target.dataset.area;
+            const s = areaState[a];
+            if (!s.visible) {
+              // Show it first
+              const cb = item.querySelector('.legend-checkbox');
+              cb.classList.add('checked');
+              item.classList.remove('hidden-area');
+              toggleArea(a, true);
+            }
+            if (s.polygon) map.fitBounds(s.polygon.getBounds(), { padding: [50, 50] });
+          });
+
+          legendItems.appendChild(item);
         }
 
-        // Build issues list
+        // Show/hide all buttons
+        document.getElementById('show-all-areas').addEventListener('click', () => {
+          legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
+            cb.classList.add('checked');
+            cb.closest('.legend-item').classList.remove('hidden-area');
+          });
+          for (const area of Object.keys(areaState)) toggleArea(area, true);
+        });
+        document.getElementById('hide-all-areas').addEventListener('click', () => {
+          legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
+            cb.classList.remove('checked');
+            cb.closest('.legend-item').classList.add('hidden-area');
+          });
+          for (const area of Object.keys(areaState)) toggleArea(area, false);
+        });
+
+        // Issues list
         const issuesList = document.getElementById('issues-list');
         if (issues.length === 0) {
           issuesList.innerHTML = '<div style="color:#4caf50;font-size:12px">אין מיקומים חריגים 🎉</div>';
@@ -295,14 +457,30 @@
         // Search
         document.getElementById('search').addEventListener('input', (e) => {
           const q = e.target.value.trim().toLowerCase();
-          for (const { marker, loc } of markers) {
+          for (const { marker, loc } of allMarkers) {
             const match = !q || loc.name.toLowerCase().includes(q) || loc.area.toLowerCase().includes(q);
-            if (match) {
-              marker.setStyle({ opacity: 1, fillOpacity: loc.issue ? 1 : 0.8 });
-            } else {
-              marker.setStyle({ opacity: 0.1, fillOpacity: 0.1 });
-            }
+            marker.setStyle({
+              opacity: match ? 1 : 0.1,
+              fillOpacity: match ? (loc.issue ? 1 : 0.8) : 0.1
+            });
           }
+        });
+
+        // Label toggles
+        document.getElementById('toggle-labels').addEventListener('change', (e) => {
+          showLocationLabels = e.target.checked;
+          updateLocationLabels();
+        });
+        document.getElementById('toggle-area-labels').addEventListener('change', (e) => {
+          showAreaLabels = e.target.checked;
+          updateAreaLabels();
+        });
+
+        // WhatsApp share
+        document.getElementById('share-whatsapp').addEventListener('click', () => {
+          const text = buildShareText();
+          const encoded = encodeURIComponent(text);
+          window.open(`https://wa.me/?text=${encoded}`, '_blank');
         });
       })
       .catch(err => {
