@@ -3,12 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Map Tracker - Israel Regions</title>
+  <title>מיפוי פוטנציאל לפי אזורים</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
-    #app { display: flex; height: 100vh; }
+    #top-banner {
+      background: linear-gradient(135deg, #0f3460, #16213e);
+      border-bottom: 2px solid #e94560;
+      padding: 12px 24px; text-align: center;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    #top-banner h1 {
+      font-size: 24px; color: #fff; margin: 0;
+      text-shadow: 0 2px 8px rgba(233,69,96,0.4);
+    }
+    #top-banner .banner-icon { font-size: 28px; }
+    #top-banner .banner-sub {
+      font-size: 12px; color: #8ac0ff; margin-top: 2px;
+    }
+    #app { display: flex; height: calc(100vh - 56px); }
     #map { flex: 1; z-index: 1; }
     #sidebar {
       width: 340px; background: #16213e; overflow-y: auto;
@@ -116,10 +130,16 @@
   </style>
 </head>
 <body>
+  <div id="top-banner">
+    <span class="banner-icon">📍</span>
+    <div>
+      <h1>מיפוי פוטנציאל לפי אזורים</h1>
+    </div>
+    <span class="banner-icon">📍</span>
+  </div>
   <div id="app">
     <div id="map"></div>
     <div id="sidebar">
-      <h1>🗺️ Map Tracker</h1>
       <input type="text" class="search-box" id="search" placeholder="חיפוש מיקום...">
       <div class="stats">
         <div><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
@@ -256,7 +276,7 @@
     function buildShareText() {
       if (!appData) return '';
       const { locs, issues, byArea } = appData;
-      let text = `🗺️ *Map Tracker - סיכום*\n\n`;
+      let text = `📍 *מיפוי פוטנציאל לפי אזורים - סיכום*\n\n`;
       text += `📍 סה"כ מיקומים: ${locs.length}\n`;
       text += `🟢 תקינים: ${locs.length - issues.length}\n`;
       text += `🔴 חריגים: ${issues.length}\n\n`;
