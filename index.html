@@ -156,43 +156,17 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="area_boundaries.js"></script>
   <script>
-    // ── Real geographic boundaries for each area ──
-    // Defined based on actual Israeli geography, NOT from the data points
-    const AREA_BOUNDARIES = {
-      'תל אביב': [
-        [32.16, 34.70], [32.16, 34.88], [32.08, 34.93],
-        [31.93, 34.93], [31.91, 34.70]
-      ],
-      'ירושלים': [
-        [31.92, 34.92], [31.92, 35.40], [31.62, 35.40],
-        [31.62, 34.92]
-      ],
-      'השרון': [
-        [32.50, 34.78], [32.50, 35.08], [32.13, 35.08],
-        [32.13, 34.78]
-      ],
-      'הצפון': [
-        [32.82, 34.88], [32.82, 35.65], [32.43, 35.65],
-        [32.43, 34.88]
-      ],
-      'המרכז': [
-        [32.16, 34.83], [32.16, 35.05], [31.87, 35.05],
-        [31.87, 34.83]
-      ],
-      'המפרץ': [
-        [33.35, 34.88], [33.35, 35.82], [32.70, 35.82],
-        [32.70, 34.88]
-      ],
-      'הדרום': [
-        [31.97, 34.55], [31.97, 35.05], [31.55, 35.05],
-        [31.55, 34.55]
-      ],
-      'אשדוד': [
-        [31.85, 34.20], [31.85, 35.45], [29.40, 35.45],
-        [29.40, 34.20]
-      ]
-    };
+    // AREA_BOUNDARIES loaded from area_boundaries.js
+    // Each area is a MultiPolygon: array of polygons, each polygon is array of [lat,lon] pairs
+
+    // Helper: check if a boundary is MultiPolygon (array of polygons, each polygon is array of [lat,lon])
+    // Simple polygon: [[lat,lon], [lat,lon], ...] -> boundary[0][0] is a number
+    // MultiPolygon: [[[lat,lon], ...], [[lat,lon], ...]] -> boundary[0][0] is an array
+    function isMultiPolygon(boundary) {
+      return Array.isArray(boundary[0]) && Array.isArray(boundary[0][0]);
+    }
 
     const AREA_COLORS = {
       'תל אביב': '#ff6b6b',
@@ -295,8 +269,17 @@
         const issues = [];
         for (const loc of locs) {
           const boundary = AREA_BOUNDARIES[loc.area];
-          if (boundary && boundary.length >= 3) {
-            if (!pointInPolygon([loc.lat, loc.lon], boundary)) {
+          if (boundary) {
+            let inside = false;
+            if (isMultiPolygon(boundary)) {
+              // MultiPolygon: check if point is in ANY of the sub-polygons
+              for (const poly of boundary) {
+                if (pointInPolygon([loc.lat, loc.lon], poly)) { inside = true; break; }
+              }
+            } else if (boundary.length >= 3) {
+              inside = pointInPolygon([loc.lat, loc.lon], boundary);
+            }
+            if (!inside) {
               loc.issue = true;
               issues.push(loc);
             }
@@ -311,14 +294,22 @@
           const areaLocs = byArea[area] || [];
           const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
 
-          // Draw the predefined geographic boundary
+          // Draw the predefined geographic boundary (supports MultiPolygon)
           state.polygon = L.polygon(boundary, {
             color, fillColor: color, fillOpacity: 0.12, weight: 2.5, dashArray: '8, 4'
           }).addTo(map);
 
           // Area label at boundary center
-          const cx = boundary.reduce((s, p) => s + p[0], 0) / boundary.length;
-          const cy = boundary.reduce((s, p) => s + p[1], 0) / boundary.length;
+          let allPoints;
+          if (isMultiPolygon(boundary)) {
+            // For MultiPolygon, use the largest sub-polygon for the label center
+            const largest = boundary.reduce((a, b) => a.length > b.length ? a : b);
+            allPoints = largest;
+          } else {
+            allPoints = boundary;
+          }
+          const cx = allPoints.reduce((s, p) => s + p[0], 0) / allPoints.length;
+          const cy = allPoints.reduce((s, p) => s + p[1], 0) / allPoints.length;
           state.areaLabel = L.marker([cx, cy], {
             icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
           }).addTo(map);
