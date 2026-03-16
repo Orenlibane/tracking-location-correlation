@@ -14,14 +14,8 @@
       padding: 12px 24px; text-align: center;
       display: flex; align-items: center; justify-content: center; gap: 12px;
     }
-    #top-banner h1 {
-      font-size: 24px; color: #fff; margin: 0;
-      text-shadow: 0 2px 8px rgba(233,69,96,0.4);
-    }
+    #top-banner h1 { font-size: 24px; color: #fff; margin: 0; text-shadow: 0 2px 8px rgba(233,69,96,0.4); }
     #top-banner .banner-icon { font-size: 28px; }
-    #top-banner .banner-sub {
-      font-size: 12px; color: #8ac0ff; margin-top: 2px;
-    }
     #app { display: flex; height: calc(100vh - 56px); }
     #map { flex: 1; z-index: 1; }
     #sidebar {
@@ -29,7 +23,6 @@
       padding: 16px; border-left: 2px solid #0f3460;
       display: flex; flex-direction: column; gap: 12px;
     }
-    h1 { font-size: 20px; color: #e94560; text-align: center; margin-bottom: 4px; }
     .stats {
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
       font-size: 13px; background: #0f3460; padding: 10px; border-radius: 8px;
@@ -40,8 +33,7 @@
     .legend h3 { font-size: 14px; margin-bottom: 8px; color: #53a8b6; }
     .legend-item {
       display: flex; align-items: center; gap: 8px;
-      padding: 5px 0; font-size: 12px; cursor: pointer;
-      transition: opacity 0.2s;
+      padding: 5px 0; font-size: 12px; cursor: pointer; transition: opacity 0.2s;
     }
     .legend-item:hover { opacity: 0.7; }
     .legend-item.hidden-area { opacity: 0.3; }
@@ -54,8 +46,7 @@
     .legend-checkbox.checked::after { content: '✓'; }
     .legend-dot {
       width: 14px; height: 14px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.3);
-      flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0;
     }
     .legend-name { flex: 1; }
     .legend-count { color: #888; font-size: 11px; }
@@ -64,9 +55,7 @@
       font-size: 10px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
     }
     .legend-zoom:hover { background: #1a2a4a; }
-    .legend-controls {
-      display: flex; gap: 6px; margin-bottom: 6px;
-    }
+    .legend-controls { display: flex; gap: 6px; margin-bottom: 6px; }
     .legend-controls button {
       flex: 1; background: #1a1a2e; border: 1px solid #334; color: #aaa;
       padding: 4px 0; font-size: 11px; cursor: pointer; border-radius: 4px;
@@ -82,20 +71,16 @@
     .issue-item:hover { background: rgba(233,69,96,0.3); }
     .search-box {
       width: 100%; padding: 8px 12px; border-radius: 6px;
-      border: 1px solid #0f3460; background: #1a1a2e; color: #eee;
-      font-size: 13px;
+      border: 1px solid #0f3460; background: #1a1a2e; color: #eee; font-size: 13px;
     }
     .search-box:focus { outline: none; border-color: #e94560; }
     .search-box::placeholder { color: #555; }
-    /* Labels toggle */
     .toggle-row {
       display: flex; align-items: center; gap: 8px;
-      background: #0f3460; padding: 8px 10px; border-radius: 8px;
-      font-size: 12px;
+      background: #0f3460; padding: 8px 10px; border-radius: 8px; font-size: 12px;
     }
     .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
     .toggle-row input[type="checkbox"] { accent-color: #e94560; }
-    /* WhatsApp share button */
     .share-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       background: #25D366; color: #fff; border: none;
@@ -104,7 +89,6 @@
     }
     .share-btn:hover { background: #1da851; }
     .share-btn svg { width: 20px; height: 20px; fill: #fff; }
-    /* Custom Leaflet popup */
     .leaflet-popup-content-wrapper { background: #16213e; color: #eee; border-radius: 8px; }
     .leaflet-popup-tip { background: #16213e; }
     .popup-title { font-weight: bold; font-size: 14px; color: #53a8b6; }
@@ -112,29 +96,30 @@
     .popup-status { font-size: 12px; margin-top: 4px; font-weight: bold; }
     .popup-status.ok { color: #4caf50; }
     .popup-status.bad { color: #e94560; }
-    /* Map labels */
     .location-label {
-      background: none !important; border: none !important;
-      box-shadow: none !important;
+      background: none !important; border: none !important; box-shadow: none !important;
       font-size: 10px; color: #ccc; font-weight: bold;
-      text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
-      white-space: nowrap;
+      text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; white-space: nowrap;
     }
     .area-label {
-      background: none !important; border: none !important;
-      box-shadow: none !important;
+      background: none !important; border: none !important; box-shadow: none !important;
       font-size: 14px; color: #fff; font-weight: bold;
-      text-shadow: 2px 2px 4px #000, -1px -1px 3px #000;
-      white-space: nowrap; opacity: 0.8;
+      text-shadow: 2px 2px 4px #000, -1px -1px 3px #000; white-space: nowrap; opacity: 0.8;
+    }
+    /* Red pulsing marker for mismatched locations */
+    .red-pulse {
+      animation: pulse-red 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 4px 2px rgba(233,69,96,0.5); }
+      50% { box-shadow: 0 0 12px 6px rgba(233,69,96,0.9); }
     }
   </style>
 </head>
 <body>
   <div id="top-banner">
     <span class="banner-icon">📍</span>
-    <div>
-      <h1>מיפוי פוטנציאל לפי אזורים</h1>
-    </div>
+    <div><h1>מיפוי פוטנציאל לפי אזורים</h1></div>
     <span class="banner-icon">📍</span>
   </div>
   <div id="app">
@@ -172,6 +157,43 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
+    // ── Real geographic boundaries for each area ──
+    // Defined based on actual Israeli geography, NOT from the data points
+    const AREA_BOUNDARIES = {
+      'תל אביב': [
+        [32.16, 34.70], [32.16, 34.88], [32.08, 34.93],
+        [31.93, 34.93], [31.91, 34.70]
+      ],
+      'ירושלים': [
+        [31.92, 34.92], [31.92, 35.40], [31.62, 35.40],
+        [31.62, 34.92]
+      ],
+      'השרון': [
+        [32.50, 34.78], [32.50, 35.08], [32.13, 35.08],
+        [32.13, 34.78]
+      ],
+      'הצפון': [
+        [32.82, 34.88], [32.82, 35.65], [32.43, 35.65],
+        [32.43, 34.88]
+      ],
+      'המרכז': [
+        [32.16, 34.83], [32.16, 35.05], [31.87, 35.05],
+        [31.87, 34.83]
+      ],
+      'המפרץ': [
+        [33.35, 34.88], [33.35, 35.82], [32.70, 35.82],
+        [32.70, 34.88]
+      ],
+      'הדרום': [
+        [31.97, 34.55], [31.97, 35.05], [31.55, 35.05],
+        [31.55, 34.55]
+      ],
+      'אשדוד': [
+        [31.85, 34.20], [31.85, 35.45], [29.40, 35.45],
+        [29.40, 34.20]
+      ]
+    };
+
     const AREA_COLORS = {
       'תל אביב': '#ff6b6b',
       'ירושלים': '#ffd93d',
@@ -184,40 +206,16 @@
     };
 
     const map = L.map('map', { center: [31.5, 34.85], zoom: 8, zoomControl: true });
-
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap © CartoDB', maxZoom: 19
     }).addTo(map);
 
-    // State
-    const areaState = {};   // { area: { visible, markers[], polygon, labels[], areaLabel } }
+    const areaState = {};
     const allMarkers = [];
     let issueMarkers = [];
-    let allLabels = [];
-    let allAreaLabels = [];
     let showLocationLabels = false;
     let showAreaLabels = true;
     let appData = null;
-
-    function convexHull(points) {
-      if (points.length < 3) return points;
-      function cross(O, A, B) {
-        return (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0]);
-      }
-      points = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-      const lower = [];
-      for (const p of points) {
-        while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
-        lower.push(p);
-      }
-      const upper = [];
-      for (const p of points.reverse()) {
-        while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
-        upper.push(p);
-      }
-      upper.pop(); lower.pop();
-      return lower.concat(upper);
-    }
 
     function pointInPolygon(point, polygon) {
       let inside = false;
@@ -227,12 +225,6 @@
         if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
       }
       return inside;
-    }
-
-    function expandPolygon(polygon, factor = 0.05) {
-      const cx = polygon.reduce((s, p) => s + p[0], 0) / polygon.length;
-      const cy = polygon.reduce((s, p) => s + p[1], 0) / polygon.length;
-      return polygon.map(([x, y]) => [cx + (x - cx) * (1 + factor), cy + (y - cy) * (1 + factor)]);
     }
 
     function toggleArea(area, visible) {
@@ -254,25 +246,17 @@
 
     function updateLocationLabels() {
       for (const [area, s] of Object.entries(areaState)) {
-        if (s.visible && showLocationLabels) {
-          s.labels.forEach(l => l.addTo(map));
-        } else {
-          s.labels.forEach(l => map.removeLayer(l));
-        }
+        if (s.visible && showLocationLabels) s.labels.forEach(l => l.addTo(map));
+        else s.labels.forEach(l => map.removeLayer(l));
       }
     }
-
     function updateAreaLabels() {
       for (const [area, s] of Object.entries(areaState)) {
-        if (s.visible && showAreaLabels && s.areaLabel) {
-          s.areaLabel.addTo(map);
-        } else if (s.areaLabel) {
-          map.removeLayer(s.areaLabel);
-        }
+        if (s.visible && showAreaLabels && s.areaLabel) s.areaLabel.addTo(map);
+        else if (s.areaLabel) map.removeLayer(s.areaLabel);
       }
     }
 
-    // Build summary text for WhatsApp
     function buildShareText() {
       if (!appData) return '';
       const { locs, issues, byArea } = appData;
@@ -289,18 +273,14 @@
       }
       if (issues.length > 0) {
         text += `\n*מיקומים חריגים:*\n`;
-        for (const loc of issues) {
-          text += `🔴 ${loc.name} (${loc.area})\n`;
-        }
+        for (const loc of issues) text += `🔴 ${loc.name} (משויך: ${loc.area})\n`;
       }
-      // Add link to deployed app if available
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         text += `\n🔗 ${window.location.href}`;
       }
       return text;
     }
 
-    // Load data and render
     fetch('locations.json')
       .then(r => r.json())
       .then(data => {
@@ -311,82 +291,77 @@
           byArea[loc.area].push(loc);
         }
 
-        const hulls = {};
-        for (const [area, areaLocs] of Object.entries(byArea)) {
-          const pts = areaLocs.map(l => [l.lat, l.lon]);
-          hulls[area] = pts.length >= 3 ? convexHull(pts) : pts;
-        }
-
-        const expandedHulls = {};
-        for (const [area, hull] of Object.entries(hulls)) {
-          expandedHulls[area] = hull.length >= 3 ? expandPolygon(hull, 0.08) : hull;
-        }
-
+        // Check each location against the REAL geographic boundary of its assigned area
         const issues = [];
         for (const loc of locs) {
-          const hull = expandedHulls[loc.area];
-          if (hull && hull.length >= 3 && !pointInPolygon([loc.lat, loc.lon], hull)) {
-            loc.issue = true;
-            issues.push(loc);
+          const boundary = AREA_BOUNDARIES[loc.area];
+          if (boundary && boundary.length >= 3) {
+            if (!pointInPolygon([loc.lat, loc.lon], boundary)) {
+              loc.issue = true;
+              issues.push(loc);
+            }
           }
         }
 
         appData = { locs, issues, byArea };
 
-        // Create layers per area
-        for (const [area, areaLocs] of Object.entries(byArea)) {
+        // Draw real geographic area polygons
+        for (const [area, boundary] of Object.entries(AREA_BOUNDARIES)) {
           const color = AREA_COLORS[area] || '#888';
-          const hull = hulls[area];
+          const areaLocs = byArea[area] || [];
           const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
 
-          // Polygon outline
-          if (hull.length >= 3) {
-            state.polygon = L.polygon(hull, {
-              color, fillColor: color, fillOpacity: 0.08, weight: 2, dashArray: '6, 4'
-            }).addTo(map);
-          }
-
-          // Area label at centroid
-          const cx = areaLocs.reduce((s, l) => s + l.lat, 0) / areaLocs.length;
-          const cy = areaLocs.reduce((s, l) => s + l.lon, 0) / areaLocs.length;
-          state.areaLabel = L.marker([cx, cy], {
-            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [100, 20], iconAnchor: [50, 10] })
+          // Draw the predefined geographic boundary
+          state.polygon = L.polygon(boundary, {
+            color, fillColor: color, fillOpacity: 0.12, weight: 2.5, dashArray: '8, 4'
           }).addTo(map);
-          allAreaLabels.push(state.areaLabel);
 
-          // Location markers + labels
+          // Area label at boundary center
+          const cx = boundary.reduce((s, p) => s + p[0], 0) / boundary.length;
+          const cy = boundary.reduce((s, p) => s + p[1], 0) / boundary.length;
+          state.areaLabel = L.marker([cx, cy], {
+            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
+          }).addTo(map);
+
+          // Location markers
           for (const loc of areaLocs) {
-            const mColor = loc.issue ? '#e94560' : color;
-            const radius = loc.issue ? 7 : 5;
+            const isIssue = loc.issue;
+            const mColor = isIssue ? '#e94560' : color;
+            const radius = isIssue ? 9 : 5;
+            const weight = isIssue ? 3 : 1;
 
             const circle = L.circleMarker([loc.lat, loc.lon], {
-              radius, fillColor: mColor, color: loc.issue ? '#fff' : mColor,
-              weight: loc.issue ? 2 : 1, fillOpacity: loc.issue ? 1 : 0.8
+              radius, fillColor: mColor,
+              color: isIssue ? '#ff0000' : mColor,
+              weight, fillOpacity: isIssue ? 1 : 0.8,
+              className: isIssue ? 'red-pulse' : ''
             }).addTo(map);
 
-            const statusClass = loc.issue ? 'bad' : 'ok';
-            const statusText = loc.issue ? '⚠️ חריג - לא נמצא באזור המוגדר' : '✓ תקין';
+            const statusClass = isIssue ? 'bad' : 'ok';
+            const statusText = isIssue
+              ? `⚠️ חריג — משויך ל"${loc.area}" אבל לא נמצא בגבולות האזור`
+              : '✓ תקין — נמצא בגבולות האזור';
             circle.bindPopup(`
               <div class="popup-title">${loc.name}</div>
-              <div class="popup-area">אזור: ${loc.area}</div>
+              <div class="popup-area">אזור משויך: ${loc.area}</div>
               <div class="popup-status ${statusClass}">${statusText}</div>
+              <div style="font-size:11px;color:#666;margin-top:4px">${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</div>
             `);
 
             state.markers.push({ marker: circle, loc });
             allMarkers.push({ marker: circle, loc });
-            if (loc.issue) issueMarkers.push({ marker: circle, loc });
+            if (isIssue) issueMarkers.push({ marker: circle, loc });
 
-            // Location label (hidden by default)
+            // Location label
+            const labelColor = isIssue ? '#ff4444' : '#ccc';
             const label = L.marker([loc.lat, loc.lon], {
               icon: L.divIcon({
                 className: 'location-label',
-                html: loc.name,
-                iconSize: [80, 14],
-                iconAnchor: [40, -6]
+                html: `<span style="color:${labelColor}">${loc.name}</span>`,
+                iconSize: [80, 14], iconAnchor: [40, -6]
               })
             });
             state.labels.push(label);
-            allLabels.push(label);
           }
 
           areaState[area] = state;
@@ -398,61 +373,50 @@
         document.getElementById('ok-count').textContent = locs.length - issues.length;
         document.getElementById('issue-count').textContent = issues.length;
 
-        // Legend with checkboxes
+        // Legend
         const legendItems = document.getElementById('legend-items');
         for (const [area, areaLocs] of Object.entries(byArea)) {
           const color = AREA_COLORS[area] || '#888';
+          const areaIssues = areaLocs.filter(l => l.issue).length;
           const item = document.createElement('div');
           item.className = 'legend-item';
           item.innerHTML = `
             <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${area}"></span>
             <span class="legend-dot" style="background:${color}"></span>
             <span class="legend-name">${area}</span>
-            <span class="legend-count">${areaLocs.length}</span>
+            <span class="legend-count">${areaLocs.length}${areaIssues > 0 ? ` <span style="color:#e94560">(${areaIssues}🔴)</span>` : ''}</span>
             <button class="legend-zoom" data-area="${area}" title="זום לאזור">⊕</button>
           `;
-
-          // Checkbox toggle
           item.querySelector('.legend-checkbox').addEventListener('click', (e) => {
-            const cb = e.target;
-            const a = cb.dataset.area;
+            const cb = e.target, a = cb.dataset.area;
             const isChecked = cb.classList.toggle('checked');
             item.classList.toggle('hidden-area', !isChecked);
             toggleArea(a, isChecked);
           });
-
-          // Zoom button
           item.querySelector('.legend-zoom').addEventListener('click', (e) => {
             e.stopPropagation();
-            const a = e.target.dataset.area;
-            const s = areaState[a];
+            const a = e.target.dataset.area, s = areaState[a];
             if (!s.visible) {
-              // Show it first
-              const cb = item.querySelector('.legend-checkbox');
-              cb.classList.add('checked');
+              item.querySelector('.legend-checkbox').classList.add('checked');
               item.classList.remove('hidden-area');
               toggleArea(a, true);
             }
             if (s.polygon) map.fitBounds(s.polygon.getBounds(), { padding: [50, 50] });
           });
-
           legendItems.appendChild(item);
         }
 
-        // Show/hide all buttons
         document.getElementById('show-all-areas').addEventListener('click', () => {
           legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
-            cb.classList.add('checked');
-            cb.closest('.legend-item').classList.remove('hidden-area');
+            cb.classList.add('checked'); cb.closest('.legend-item').classList.remove('hidden-area');
           });
-          for (const area of Object.keys(areaState)) toggleArea(area, true);
+          for (const a of Object.keys(areaState)) toggleArea(a, true);
         });
         document.getElementById('hide-all-areas').addEventListener('click', () => {
           legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
-            cb.classList.remove('checked');
-            cb.closest('.legend-item').classList.add('hidden-area');
+            cb.classList.remove('checked'); cb.closest('.legend-item').classList.add('hidden-area');
           });
-          for (const area of Object.keys(areaState)) toggleArea(area, false);
+          for (const a of Object.keys(areaState)) toggleArea(a, false);
         });
 
         // Issues list
@@ -463,7 +427,7 @@
           for (const loc of issues) {
             const item = document.createElement('div');
             item.className = 'issue-item';
-            item.textContent = `${loc.name} (${loc.area})`;
+            item.textContent = `${loc.name} → ${loc.area}`;
             item.addEventListener('click', () => {
               map.setView([loc.lat, loc.lon], 12);
               const m = issueMarkers.find(im => im.loc === loc);
@@ -478,34 +442,25 @@
           const q = e.target.value.trim().toLowerCase();
           for (const { marker, loc } of allMarkers) {
             const match = !q || loc.name.toLowerCase().includes(q) || loc.area.toLowerCase().includes(q);
-            marker.setStyle({
-              opacity: match ? 1 : 0.1,
-              fillOpacity: match ? (loc.issue ? 1 : 0.8) : 0.1
-            });
+            marker.setStyle({ opacity: match ? 1 : 0.1, fillOpacity: match ? (loc.issue ? 1 : 0.8) : 0.1 });
           }
         });
 
-        // Label toggles
         document.getElementById('toggle-labels').addEventListener('change', (e) => {
-          showLocationLabels = e.target.checked;
-          updateLocationLabels();
+          showLocationLabels = e.target.checked; updateLocationLabels();
         });
         document.getElementById('toggle-area-labels').addEventListener('change', (e) => {
-          showAreaLabels = e.target.checked;
-          updateAreaLabels();
+          showAreaLabels = e.target.checked; updateAreaLabels();
         });
-
-        // WhatsApp share
         document.getElementById('share-whatsapp').addEventListener('click', () => {
           const text = buildShareText();
-          const encoded = encodeURIComponent(text);
-          window.open(`https://wa.me/?text=${encoded}`, '_blank');
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
         });
       })
       .catch(err => {
         console.error('Failed to load locations:', err);
         document.getElementById('issues-list').innerHTML =
-          '<div style="color:#e94560">Error loading data. Run geocode.py first.</div>';
+          '<div style="color:#e94560">Error loading data.</div>';
       });
   </script>
 </body>
