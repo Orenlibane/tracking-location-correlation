@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Build area polygon boundaries from municipality GeoJSON files.
-Each municipality is shown as its own polygon, colored by area.
-Each municipality is assigned to exactly ONE area (majority vote).
+Uses district-level boundaries to constrain which area each municipality
+can be assigned to, preventing cross-region assignment errors.
 """
 
 import json
@@ -14,6 +14,17 @@ from shapely.ops import unary_union
 
 POLY_DIR = "/Users/orentzezana/Downloads/poly/israel-municipalities-polygons"
 LOCATIONS_FILE = "/Users/orentzezana/Desktop/my-test-rpg-dungeon/map-tracking/locations.json"
+DISTRICTS_FILE = "/Users/orentzezana/Desktop/my-test-rpg-dungeon/map-tracking/districts.geojson"
+
+# Which app areas are allowed in each district
+DISTRICT_TO_AREAS = {
+    "tel_aviv":  ["תל אביב"],
+    "jerusalem": ["ירושלים"],
+    "center":    ["המרכז", "השרון", "הדרום", "תל אביב"],
+    "haifa":     ["המפרץ", "הצפון", "השרון"],
+    "north":     ["הצפון", "המפרץ", "השרון"],
+    "south":     ["אשדוד", "הדרום"],
+}
 
 
 def load_all_municipalities():
@@ -41,11 +52,28 @@ def load_all_municipalities():
     return munis
 
 
+def load_districts():
+    with open(DISTRICTS_FILE, 'r') as f:
+        data = json.load(f)
+    districts = {}
+    for feature in data["features"]:
+        geom = shape(feature["geometry"])
+        districts[feature["id"]] = geom
+    return districts
+
+
+def find_district(lat, lon, districts):
+    """Find which district a point falls in."""
+    pt = Point(lon, lat)
+    for dist_id, geom in districts.items():
+        if geom.contains(pt):
+            return dist_id
+    return None
+
+
 def geom_to_leaflet(geom, simplify_tolerance=0.002):
-    """Convert shapely geometry to Leaflet [lat, lon] arrays."""
     if simplify_tolerance:
         geom = geom.simplify(simplify_tolerance, preserve_topology=True)
-
     if isinstance(geom, Polygon):
         coords = list(geom.exterior.coords)
         return [[round(lat, 5), round(lon, 5)] for lon, lat in coords]
@@ -69,26 +97,36 @@ def main():
         by_area.setdefault(loc["area"], []).append(loc)
     print(f"Found {len(locations)} locations in {len(by_area)} areas")
 
+    print("Loading districts...")
+    districts = load_districts()
+    print(f"Loaded {len(districts)} districts")
+
     print("Loading municipality polygons...")
     municipalities = load_all_municipalities()
     print(f"Loaded {len(municipalities)} municipality polygons")
 
-    # For each location, find its municipality
+    # Step 1: For each location, find its municipality AND district
     muni_area_counts = defaultdict(lambda: defaultdict(int))
     muni_geometries = {}
+    muni_districts = defaultdict(set)  # track which districts a muni spans
     unmatched = []
 
     for loc in locations:
         pt = Point(loc["lon"], loc["lat"])
-        found = False
+        found_muni = False
         for m in municipalities:
             if m["geometry"].contains(pt):
                 name = m["name_heb"]
                 muni_area_counts[name][loc["area"]] += 1
                 muni_geometries[name] = m["geometry"]
-                found = True
+                found_muni = True
+                # Track district for this municipality (use centroid)
+                centroid = m["geometry"].centroid
+                dist = find_district(centroid.y, centroid.x, districts)
+                if dist:
+                    muni_districts[name].add(dist)
                 break
-        if not found:
+        if not found_muni:
             unmatched.append(loc)
 
     if unmatched:
@@ -96,16 +134,36 @@ def main():
         for loc in unmatched:
             print(f"    - {loc['name']} ({loc['area']}) at {loc['lat']}, {loc['lon']}")
 
-    # Assign each municipality to ONE area (majority vote)
+    # Step 2: Assign each municipality to ONE area, constrained by district
     muni_to_area = {}
     for muni_name, area_counts in muni_area_counts.items():
-        winner = max(area_counts, key=area_counts.get)
+        dists = muni_districts.get(muni_name, set())
+
+        # Get allowed areas based on district
+        allowed_areas = set()
+        for d in dists:
+            allowed_areas.update(DISTRICT_TO_AREAS.get(d, []))
+
+        if allowed_areas:
+            # Filter counts to only allowed areas
+            filtered = {a: c for a, c in area_counts.items() if a in allowed_areas}
+            if filtered:
+                winner = max(filtered, key=filtered.get)
+            else:
+                # No match with district constraint - fall back to majority
+                winner = max(area_counts, key=area_counts.get)
+                print(f"  No district match for {muni_name} (district: {dists}, areas: {list(area_counts.keys())}) -> fallback to {winner}")
+        else:
+            # No district found - fall back to majority
+            winner = max(area_counts, key=area_counts.get)
+
         muni_to_area[muni_name] = winner
+
         if len(area_counts) > 1:
             parts = ', '.join(f'{a}({c})' for a, c in sorted(area_counts.items(), key=lambda x: -x[1]))
             print(f"  Conflict: {muni_name}: {parts} -> {winner}")
 
-    # Group by area, output individual municipality polygons
+    # Step 3: Group by area, output individual municipality polygons
     area_munis = defaultdict(list)
     for muni_name, area in muni_to_area.items():
         coords = geom_to_leaflet(muni_geometries[muni_name], simplify_tolerance=0.002)
@@ -115,7 +173,8 @@ def main():
     print("\nArea municipality counts:")
     for area in by_area:
         munis = area_munis.get(area, [])
-        print(f"  {area}: {len(munis)} municipalities")
+        names = [m["name"] for m in munis]
+        print(f"  {area}: {len(munis)} municipalities: {', '.join(names)}")
 
     # Output as JavaScript
     js_output = "const AREA_MUNICIPALITIES = "
