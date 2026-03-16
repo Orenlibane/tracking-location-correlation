@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Map Tracker - Israel Regions</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
+    #app { display: flex; height: 100vh; }
+    #map { flex: 1; z-index: 1; }
+    #sidebar {
+      width: 320px; background: #16213e; overflow-y: auto;
+      padding: 16px; border-left: 2px solid #0f3460;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    h1 { font-size: 20px; color: #e94560; text-align: center; margin-bottom: 4px; }
+    .stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      font-size: 13px; background: #0f3460; padding: 10px; border-radius: 8px;
+    }
+    .stat-val { font-size: 20px; font-weight: bold; color: #e94560; }
+    .stat-label { color: #aaa; font-size: 11px; }
+    .legend { background: #0f3460; padding: 10px; border-radius: 8px; }
+    .legend h3 { font-size: 14px; margin-bottom: 8px; color: #53a8b6; }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0; font-size: 12px; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .legend-item:hover { opacity: 0.7; }
+    .legend-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+    .legend-count { color: #888; margin-right: auto; font-size: 11px; }
+    .issues { background: #0f3460; padding: 10px; border-radius: 8px; }
+    .issues h3 { font-size: 14px; margin-bottom: 8px; color: #e94560; }
+    .issue-item {
+      font-size: 11px; padding: 4px 6px; margin-bottom: 4px;
+      background: rgba(233,69,96,0.15); border-radius: 4px;
+      border-left: 3px solid #e94560; cursor: pointer;
+    }
+    .issue-item:hover { background: rgba(233,69,96,0.3); }
+    .search-box {
+      width: 100%; padding: 8px 12px; border-radius: 6px;
+      border: 1px solid #0f3460; background: #1a1a2e; color: #eee;
+      font-size: 13px;
+    }
+    .search-box:focus { outline: none; border-color: #e94560; }
+    .search-box::placeholder { color: #555; }
+    /* Custom Leaflet popup */
+    .leaflet-popup-content-wrapper { background: #16213e; color: #eee; border-radius: 8px; }
+    .leaflet-popup-tip { background: #16213e; }
+    .popup-title { font-weight: bold; font-size: 14px; color: #53a8b6; }
+    .popup-area { font-size: 12px; color: #aaa; margin-top: 2px; }
+    .popup-status { font-size: 12px; margin-top: 4px; font-weight: bold; }
+    .popup-status.ok { color: #4caf50; }
+    .popup-status.bad { color: #e94560; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="map"></div>
+    <div id="sidebar">
+      <h1>🗺️ Map Tracker</h1>
+      <input type="text" class="search-box" id="search" placeholder="חיפוש מיקום...">
+      <div class="stats">
+        <div><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
+        <div><div class="stat-val" id="area-count">0</div><div class="stat-label">אזורים</div></div>
+        <div><div class="stat-val" id="ok-count">0</div><div class="stat-label">תקינים</div></div>
+        <div><div class="stat-val" id="issue-count" style="color:#e94560">0</div><div class="stat-label">חריגים</div></div>
+      </div>
+      <div class="legend" id="legend">
+        <h3>אזורים</h3>
+      </div>
+      <div class="issues" id="issues-panel">
+        <h3>🔴 מיקומים חריגים</h3>
+        <div id="issues-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Area colors
+    const AREA_COLORS = {
+      'תל אביב': '#ff6b6b',
+      'ירושלים': '#ffd93d',
+      'השרון': '#6bcb77',
+      'הצפון': '#4d96ff',
+      'המרכז': '#ff922b',
+      'המפרץ': '#845ec2',
+      'הדרום': '#ff6f91',
+      'דרום': '#c34a36',
+      'אשדוד': '#00c9a7'
+    };
+
+    // Initialize map centered on Israel
+    const map = L.map('map', {
+      center: [31.5, 34.85],
+      zoom: 8,
+      zoomControl: true
+    });
+
+    // Use CartoDB dark tile layer for sleek look
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CartoDB',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Layer groups per area
+    const areaLayers = {};
+    const areaPolygons = {};
+    const markers = [];
+    let issueMarkers = [];
+
+    // Compute convex hull (Graham scan)
+    function convexHull(points) {
+      if (points.length < 3) return points;
+      function cross(O, A, B) {
+        return (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0]);
+      }
+      points = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const lower = [];
+      for (const p of points) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
+          lower.pop();
+        lower.push(p);
+      }
+      const upper = [];
+      for (const p of points.reverse()) {
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
+          upper.pop();
+        upper.push(p);
+      }
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    // Point in polygon test (ray casting)
+    function pointInPolygon(point, polygon) {
+      let inside = false;
+      const [x, y] = point;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    // Expand polygon slightly for tolerance
+    function expandPolygon(polygon, factor = 0.05) {
+      const cx = polygon.reduce((s, p) => s + p[0], 0) / polygon.length;
+      const cy = polygon.reduce((s, p) => s + p[1], 0) / polygon.length;
+      return polygon.map(([x, y]) => [
+        cx + (x - cx) * (1 + factor),
+        cy + (y - cy) * (1 + factor)
+      ]);
+    }
+
+    // Load data and render
+    fetch('locations.json')
+      .then(r => r.json())
+      .then(data => {
+        const locs = data.locations;
+
+        // Group by area
+        const byArea = {};
+        for (const loc of locs) {
+          if (!byArea[loc.area]) byArea[loc.area] = [];
+          byArea[loc.area].push(loc);
+        }
+
+        // Build convex hulls per area
+        const hulls = {};
+        for (const [area, areaLocs] of Object.entries(byArea)) {
+          const pts = areaLocs.map(l => [l.lat, l.lon]);
+          if (pts.length >= 3) {
+            hulls[area] = convexHull(pts);
+          } else {
+            hulls[area] = pts;
+          }
+        }
+
+        // Expanded hulls for tolerance check
+        const expandedHulls = {};
+        for (const [area, hull] of Object.entries(hulls)) {
+          expandedHulls[area] = hull.length >= 3 ? expandPolygon(hull, 0.08) : hull;
+        }
+
+        // Determine issues: check if each location falls within its area's expanded hull
+        const issues = [];
+        for (const loc of locs) {
+          const hull = expandedHulls[loc.area];
+          if (hull && hull.length >= 3) {
+            if (!pointInPolygon([loc.lat, loc.lon], hull)) {
+              loc.issue = true;
+              issues.push(loc);
+            }
+          }
+        }
+
+        // Draw area polygons (outlines)
+        for (const [area, hull] of Object.entries(hulls)) {
+          if (hull.length < 3) continue;
+          const color = AREA_COLORS[area] || '#888';
+          const polygon = L.polygon(hull, {
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.08,
+            weight: 2,
+            dashArray: '6, 4'
+          }).addTo(map);
+          polygon.bindTooltip(area, { permanent: false, direction: 'center', className: '' });
+          areaPolygons[area] = polygon;
+        }
+
+        // Draw location markers
+        for (const loc of locs) {
+          const color = loc.issue ? '#e94560' : (AREA_COLORS[loc.area] || '#888');
+          const radius = loc.issue ? 7 : 5;
+
+          const circle = L.circleMarker([loc.lat, loc.lon], {
+            radius: radius,
+            fillColor: color,
+            color: loc.issue ? '#fff' : color,
+            weight: loc.issue ? 2 : 1,
+            fillOpacity: loc.issue ? 1 : 0.8
+          }).addTo(map);
+
+          const statusClass = loc.issue ? 'bad' : 'ok';
+          const statusText = loc.issue ? '⚠️ חריג - לא נמצא באזור המוגדר' : '✓ תקין';
+
+          circle.bindPopup(`
+            <div class="popup-title">${loc.name}</div>
+            <div class="popup-area">אזור: ${loc.area}</div>
+            <div class="popup-status ${statusClass}">${statusText}</div>
+          `);
+
+          markers.push({ marker: circle, loc });
+          if (loc.issue) issueMarkers.push({ marker: circle, loc });
+        }
+
+        // Update stats
+        document.getElementById('total-count').textContent = locs.length;
+        document.getElementById('area-count').textContent = Object.keys(byArea).length;
+        document.getElementById('ok-count').textContent = locs.length - issues.length;
+        document.getElementById('issue-count').textContent = issues.length;
+
+        // Build legend
+        const legendEl = document.getElementById('legend');
+        for (const [area, areaLocs] of Object.entries(byArea)) {
+          const color = AREA_COLORS[area] || '#888';
+          const item = document.createElement('div');
+          item.className = 'legend-item';
+          item.innerHTML = `
+            <span class="legend-dot" style="background:${color}"></span>
+            <span>${area}</span>
+            <span class="legend-count">${areaLocs.length}</span>
+          `;
+          item.addEventListener('click', () => {
+            // Zoom to area
+            if (areaPolygons[area]) {
+              map.fitBounds(areaPolygons[area].getBounds(), { padding: [50, 50] });
+            }
+          });
+          legendEl.appendChild(item);
+        }
+
+        // Build issues list
+        const issuesList = document.getElementById('issues-list');
+        if (issues.length === 0) {
+          issuesList.innerHTML = '<div style="color:#4caf50;font-size:12px">אין מיקומים חריגים 🎉</div>';
+        } else {
+          for (const loc of issues) {
+            const item = document.createElement('div');
+            item.className = 'issue-item';
+            item.textContent = `${loc.name} (${loc.area})`;
+            item.addEventListener('click', () => {
+              map.setView([loc.lat, loc.lon], 12);
+              const m = issueMarkers.find(im => im.loc === loc);
+              if (m) m.marker.openPopup();
+            });
+            issuesList.appendChild(item);
+          }
+        }
+
+        // Search
+        document.getElementById('search').addEventListener('input', (e) => {
+          const q = e.target.value.trim().toLowerCase();
+          for (const { marker, loc } of markers) {
+            const match = !q || loc.name.toLowerCase().includes(q) || loc.area.toLowerCase().includes(q);
+            if (match) {
+              marker.setStyle({ opacity: 1, fillOpacity: loc.issue ? 1 : 0.8 });
+            } else {
+              marker.setStyle({ opacity: 0.1, fillOpacity: 0.1 });
+            }
+          }
+        });
+      })
+      .catch(err => {
+        console.error('Failed to load locations:', err);
+        document.getElementById('issues-list').innerHTML =
+          '<div style="color:#e94560">Error loading data. Run geocode.py first.</div>';
+      });
+  </script>
+</body>
+</html>
