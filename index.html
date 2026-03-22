@@ -278,24 +278,26 @@
 
         appData = { locs, issues, byArea };
 
-        // Draw area boundary polygons
-        for (const [area, boundary] of Object.entries(AREA_BOUNDARIES)) {
+        // Draw areas and location markers even when a boundary file is missing for some areas
+        for (const [area, areaLocs] of Object.entries(byArea)) {
           const color = AREA_COLORS[area] || '#888';
-          const areaLocs = byArea[area] || [];
+          const boundary = AREA_BOUNDARIES[area];
           const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
 
-          // Draw the area polygon (handles both simple and multi-polygon)
-          const poly = L.polygon(boundary, {
-            color, fillColor: color, fillOpacity: 0.12, weight: 2, dashArray: '6, 3'
-          }).addTo(map);
-          poly.bindTooltip(area, { sticky: true, className: 'location-label' });
-          state.polygon = poly;
+          if (boundary) {
+            // Draw the area polygon (handles both simple and multi-polygon)
+            const poly = L.polygon(boundary, {
+              color, fillColor: color, fillOpacity: 0.12, weight: 2, dashArray: '6, 3'
+            }).addTo(map);
+            poly.bindTooltip(area, { sticky: true, className: 'location-label' });
+            state.polygon = poly;
 
-          // Area label at polygon center
-          const center = poly.getBounds().getCenter();
-          state.areaLabel = L.marker(center, {
-            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
-          }).addTo(map);
+            // Area label at polygon center
+            const center = poly.getBounds().getCenter();
+            state.areaLabel = L.marker(center, {
+              icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
+            }).addTo(map);
+          }
 
           // Location markers
           for (const loc of areaLocs) {
@@ -338,6 +340,13 @@
           }
 
           areaState[area] = state;
+        }
+
+        const visibleLayers = allMarkers.map(({ marker }) => marker);
+        const visiblePolygons = Object.values(areaState).flatMap(s => s.polygon ? [s.polygon] : []);
+        const boundsLayers = [...visibleLayers, ...visiblePolygons];
+        if (boundsLayers.length > 0) {
+          map.fitBounds(L.featureGroup(boundsLayers).getBounds().pad(0.1));
         }
 
         // Stats
