@@ -19,23 +19,37 @@
     #app { display: flex; height: calc(100vh - 56px); }
     #map { flex: 1; z-index: 1; }
     #sidebar {
-      width: 340px; background: #16213e; overflow-y: auto;
+      width: 360px; background: #16213e; overflow-y: auto;
       padding: 16px; border-left: 2px solid #0f3460;
       display: flex; flex-direction: column; gap: 12px;
     }
+    .panel { background: #0f3460; padding: 12px; border-radius: 10px; }
+    .panel h3 { font-size: 14px; margin-bottom: 10px; color: #53a8b6; }
     .stats {
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-      font-size: 13px; background: #0f3460; padding: 10px; border-radius: 8px;
+      font-size: 13px;
     }
+    .stat-box { background: rgba(255,255,255,0.04); padding: 10px; border-radius: 8px; }
     .stat-val { font-size: 20px; font-weight: bold; color: #e94560; }
     .stat-label { color: #aaa; font-size: 11px; }
-    .legend { background: #0f3460; padding: 10px; border-radius: 8px; }
-    .legend h3 { font-size: 14px; margin-bottom: 8px; color: #53a8b6; }
+    .search-box, .form-select {
+      width: 100%; padding: 8px 12px; border-radius: 6px;
+      border: 1px solid #294264; background: #1a1a2e; color: #eee; font-size: 13px;
+    }
+    .search-box:focus, .form-select:focus, .save-btn:focus {
+      outline: none; border-color: #e94560;
+    }
+    .toggle-row {
+      display: flex; align-items: center; gap: 8px;
+      background: #0f3460; padding: 8px 10px; border-radius: 8px; font-size: 12px;
+    }
+    .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
+    .toggle-row input[type="checkbox"] { accent-color: #e94560; }
     .legend-item {
       display: flex; align-items: center; gap: 8px;
       padding: 5px 0; font-size: 12px; cursor: pointer; transition: opacity 0.2s;
     }
-    .legend-item:hover { opacity: 0.7; }
+    .legend-item:hover { opacity: 0.75; }
     .legend-item.hidden-area { opacity: 0.3; }
     .legend-checkbox {
       width: 16px; height: 16px; border-radius: 3px;
@@ -46,10 +60,10 @@
     .legend-checkbox.checked::after { content: '✓'; }
     .legend-dot {
       width: 14px; height: 14px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.25); flex-shrink: 0;
     }
     .legend-name { flex: 1; }
-    .legend-count { color: #888; font-size: 11px; }
+    .legend-count { color: #8ea2b8; font-size: 11px; }
     .legend-zoom {
       background: none; border: 1px solid #334; color: #8ac0ff;
       font-size: 10px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
@@ -61,26 +75,33 @@
       padding: 4px 0; font-size: 11px; cursor: pointer; border-radius: 4px;
     }
     .legend-controls button:hover { background: #222; color: #eee; }
-    .issues { background: #0f3460; padding: 10px; border-radius: 8px; }
-    .issues h3 { font-size: 14px; margin-bottom: 8px; color: #e94560; }
-    .issue-item {
-      font-size: 11px; padding: 4px 6px; margin-bottom: 4px;
-      background: rgba(233,69,96,0.15); border-radius: 4px;
-      border-left: 3px solid #e94560; cursor: pointer;
+    .review-empty, .invalid-empty {
+      color: #8ea2b8; font-size: 12px; line-height: 1.5;
     }
-    .issue-item:hover { background: rgba(233,69,96,0.3); }
-    .search-box {
-      width: 100%; padding: 8px 12px; border-radius: 6px;
-      border: 1px solid #0f3460; background: #1a1a2e; color: #eee; font-size: 13px;
+    .form-row { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .form-label { font-size: 12px; color: #8ea2b8; }
+    .save-btn {
+      width: 100%; margin-top: 12px; padding: 10px; border-radius: 8px;
+      background: #e94560; border: none; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer;
     }
-    .search-box:focus { outline: none; border-color: #e94560; }
-    .search-box::placeholder { color: #555; }
-    .toggle-row {
-      display: flex; align-items: center; gap: 8px;
-      background: #0f3460; padding: 8px 10px; border-radius: 8px; font-size: 12px;
+    .save-btn:hover { background: #ff5f78; }
+    .save-btn:disabled { opacity: 0.5; cursor: wait; }
+    .review-meta { font-size: 12px; color: #cfd8e3; line-height: 1.6; }
+    .review-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: bold;
+      margin-top: 8px;
     }
-    .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
-    .toggle-row input[type="checkbox"] { accent-color: #e94560; }
+    .review-status.ok { background: rgba(76,175,80,0.16); color: #7ce38a; }
+    .review-status.bad { background: rgba(233,69,96,0.18); color: #ff889b; }
+    .review-status.unreviewed { background: rgba(255,255,255,0.08); color: #d7dee8; }
+    .invalid-item {
+      font-size: 11px; padding: 6px 8px; margin-bottom: 6px;
+      background: rgba(233,69,96,0.12); border-radius: 6px;
+      border-right: 3px solid #e94560; cursor: pointer;
+    }
+    .invalid-item:hover { background: rgba(233,69,96,0.2); }
+    .status-hint { font-size: 11px; color: #8ea2b8; margin-top: 6px; line-height: 1.4; }
     .share-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       background: #25D366; color: #fff; border: none;
@@ -94,8 +115,9 @@
     .popup-title { font-weight: bold; font-size: 14px; color: #53a8b6; }
     .popup-area { font-size: 12px; color: #aaa; margin-top: 2px; }
     .popup-status { font-size: 12px; margin-top: 4px; font-weight: bold; }
-    .popup-status.ok { color: #4caf50; }
-    .popup-status.bad { color: #e94560; }
+    .popup-status.ok { color: #7ce38a; }
+    .popup-status.bad { color: #ff889b; }
+    .popup-status.unreviewed { color: #d7dee8; }
     .location-label {
       background: none !important; border: none !important; box-shadow: none !important;
       font-size: 10px; color: #ccc; font-weight: bold;
@@ -105,6 +127,11 @@
       background: none !important; border: none !important; box-shadow: none !important;
       font-size: 14px; color: #fff; font-weight: bold;
       text-shadow: 2px 2px 4px #000, -1px -1px 3px #000; white-space: nowrap; opacity: 0.8;
+    }
+    @media (max-width: 960px) {
+      #app { flex-direction: column; height: auto; }
+      #map { height: 58vh; }
+      #sidebar { width: 100%; border-left: none; border-top: 2px solid #0f3460; }
     }
   </style>
 </head>
@@ -117,18 +144,28 @@
   <div id="app">
     <div id="map"></div>
     <div id="sidebar">
-      <input type="text" class="search-box" id="search" placeholder="חיפוש מיקום...">
-      <div class="stats">
-        <div><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
-        <div><div class="stat-val" id="area-count">0</div><div class="stat-label">אזורים</div></div>
-        <div><div class="stat-val" id="ok-count">0</div><div class="stat-label">תקינים</div></div>
-        <div><div class="stat-val" id="issue-count" style="color:#e94560">0</div><div class="stat-label">חריגים</div></div>
+      <input type="text" class="search-box" id="search" placeholder="חיפוש מיקום או אזור...">
+
+      <div class="panel">
+        <div class="stats">
+          <div class="stat-box"><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
+          <div class="stat-box"><div class="stat-val" id="area-count">0</div><div class="stat-label">אזורים</div></div>
+          <div class="stat-box"><div class="stat-val" id="ok-count" style="color:#7ce38a">0</div><div class="stat-label">תקינים</div></div>
+          <div class="stat-box"><div class="stat-val" id="bad-count" style="color:#ff889b">0</div><div class="stat-label">לא תקינים</div></div>
+        </div>
       </div>
+
       <div class="toggle-row">
         <label><input type="checkbox" id="toggle-labels"> הצג שמות מיקומים</label>
         <label><input type="checkbox" id="toggle-area-labels" checked> שמות אזורים</label>
       </div>
-      <div class="legend" id="legend">
+
+      <div class="panel" id="review-panel">
+        <h3>עדכון מיקום</h3>
+        <div id="review-content" class="review-empty">לחץ על נקודה במפה כדי לעדכן סטטוס ולשייך אזור במידת הצורך.</div>
+      </div>
+
+      <div class="panel">
         <h3>אזורים</h3>
         <div class="legend-controls">
           <button id="show-all-areas">הצג הכל</button>
@@ -136,10 +173,12 @@
         </div>
         <div id="legend-items"></div>
       </div>
-      <div class="issues" id="issues-panel">
-        <h3>🔴 מיקומים חריגים</h3>
-        <div id="issues-list"></div>
+
+      <div class="panel">
+        <h3>מיקומים לא תקינים</h3>
+        <div id="invalid-list"></div>
       </div>
+
       <button class="share-btn" id="share-whatsapp">
         <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         שתף ב-WhatsApp
@@ -150,22 +189,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="area_boundaries.js"></script>
   <script>
-    // AREA_BOUNDARIES loaded from area_boundaries.js
-    // Each area has a polygon (array of [lat,lon]) or MultiPolygon (array of arrays)
-
-    // Helper: check if boundary is a MultiPolygon (array of polygons)
-    function isMultiPolygon(boundary) {
-      return Array.isArray(boundary[0]) && Array.isArray(boundary[0][0]);
-    }
-
-    // Check if point is inside boundary (handles both Polygon and MultiPolygon)
-    function pointInBoundary(point, boundary) {
-      if (isMultiPolygon(boundary)) {
-        return boundary.some(ring => pointInPolygon(point, ring));
-      }
-      return pointInPolygon(point, boundary);
-    }
-
     const AREA_COLORS = {
       'תל אביב': '#ff6b6b',
       'ירושלים': '#ffd93d',
@@ -177,274 +200,511 @@
       'אשדוד': '#00c9a7'
     };
 
+    const STATUS_LABELS = {
+      unreviewed: 'טרם נבדק',
+      ok: 'תקין',
+      bad: 'לא תקין'
+    };
+
     const map = L.map('map', { center: [31.5, 34.85], zoom: 8, zoomControl: true });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap © CartoDB', maxZoom: 19
     }).addTo(map);
 
-    const areaState = {};
-    const allMarkers = [];
-    let issueMarkers = [];
-    let showLocationLabels = false;
-    let showAreaLabels = true;
-    let appData = null;
+    const state = {
+      locations: [],
+      areas: [],
+      selectedLocationName: null,
+      areaState: {},
+      allMarkers: [],
+      markerByName: {},
+      showLocationLabels: false,
+      showAreaLabels: true,
+      searchQuery: ''
+    };
 
-    function pointInPolygon(point, polygon) {
-      let inside = false;
-      const [x, y] = point;
-      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const [xi, yi] = polygon[i], [xj, yj] = polygon[j];
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
-      }
-      return inside;
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
     }
 
-    function toggleArea(area, visible) {
-      const s = areaState[area];
-      if (!s) return;
-      s.visible = visible;
-      if (visible) {
-        if (s.polygon) s.polygon.addTo(map);
-        s.markers.forEach(m => m.marker.addTo(map));
-        if (showLocationLabels) s.labels.forEach(l => l.addTo(map));
-        if (showAreaLabels && s.areaLabel) s.areaLabel.addTo(map);
-      } else {
-        if (s.polygon) map.removeLayer(s.polygon);
-        s.markers.forEach(m => map.removeLayer(m.marker));
-        s.labels.forEach(l => map.removeLayer(l));
-        if (s.areaLabel) map.removeLayer(s.areaLabel);
+    function getBoundary(area) {
+      return typeof AREA_BOUNDARIES === 'object' && AREA_BOUNDARIES ? AREA_BOUNDARIES[area] : null;
+    }
+
+    function getEffectiveArea(loc) {
+      return loc.effective_area || (loc.status === 'bad' && loc.assigned_area ? loc.assigned_area : loc.area);
+    }
+
+    function getColor(area) {
+      return AREA_COLORS[area] || '#888';
+    }
+
+    function getStatusClass(status) {
+      return status === 'ok' ? 'ok' : (status === 'bad' ? 'bad' : 'unreviewed');
+    }
+
+    function getStatusText(status) {
+      return STATUS_LABELS[status] || STATUS_LABELS.unreviewed;
+    }
+
+    function groupByArea(locations) {
+      const byArea = {};
+      for (const loc of locations) {
+        const area = getEffectiveArea(loc);
+        if (!byArea[area]) byArea[area] = [];
+        byArea[area].push(loc);
       }
+      return byArea;
+    }
+
+    function clearMapLayers() {
+      for (const areaState of Object.values(state.areaState)) {
+        if (areaState.polygon) map.removeLayer(areaState.polygon);
+        if (areaState.areaLabel) map.removeLayer(areaState.areaLabel);
+        areaState.markers.forEach(entry => map.removeLayer(entry.marker));
+        areaState.labels.forEach(label => map.removeLayer(label));
+      }
+      state.areaState = {};
+      state.allMarkers = [];
+      state.markerByName = {};
     }
 
     function updateLocationLabels() {
-      for (const [area, s] of Object.entries(areaState)) {
-        if (s.visible && showLocationLabels) s.labels.forEach(l => l.addTo(map));
-        else s.labels.forEach(l => map.removeLayer(l));
+      for (const areaState of Object.values(state.areaState)) {
+        if (areaState.visible && state.showLocationLabels) areaState.labels.forEach(label => label.addTo(map));
+        else areaState.labels.forEach(label => map.removeLayer(label));
       }
     }
+
     function updateAreaLabels() {
-      for (const [area, s] of Object.entries(areaState)) {
-        if (s.visible && showAreaLabels && s.areaLabel) s.areaLabel.addTo(map);
-        else if (s.areaLabel) map.removeLayer(s.areaLabel);
+      for (const areaState of Object.values(state.areaState)) {
+        if (areaState.visible && state.showAreaLabels && areaState.areaLabel) areaState.areaLabel.addTo(map);
+        else if (areaState.areaLabel) map.removeLayer(areaState.areaLabel);
+      }
+    }
+
+    function toggleArea(area, visible) {
+      const areaState = state.areaState[area];
+      if (!areaState) return;
+      areaState.visible = visible;
+      if (visible) {
+        if (areaState.polygon) areaState.polygon.addTo(map);
+        areaState.markers.forEach(entry => entry.marker.addTo(map));
+        if (state.showLocationLabels) areaState.labels.forEach(label => label.addTo(map));
+        if (state.showAreaLabels && areaState.areaLabel) areaState.areaLabel.addTo(map);
+      } else {
+        if (areaState.polygon) map.removeLayer(areaState.polygon);
+        areaState.markers.forEach(entry => map.removeLayer(entry.marker));
+        areaState.labels.forEach(label => map.removeLayer(label));
+        if (areaState.areaLabel) map.removeLayer(areaState.areaLabel);
+      }
+    }
+
+    function createPopupHtml(loc) {
+      const effectiveArea = getEffectiveArea(loc);
+      const extraArea = loc.status === 'bad' && loc.assigned_area
+        ? `<div class="popup-area">שויך מחדש ל: ${escapeHtml(loc.assigned_area)}</div>`
+        : '';
+      return `
+        <div class="popup-title">${escapeHtml(loc.name)}</div>
+        <div class="popup-area">אזור מקור: ${escapeHtml(loc.area)}</div>
+        <div class="popup-area">אזור מוצג: ${escapeHtml(effectiveArea)}</div>
+        ${extraArea}
+        <div class="popup-status ${getStatusClass(loc.status)}">${escapeHtml(getStatusText(loc.status))}</div>
+        <div style="font-size:11px;color:#9fb0c3;margin-top:4px">${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</div>
+        <div style="font-size:11px;color:#8ea2b8;margin-top:6px">לחץ כדי לערוך בפאנל הצד.</div>
+      `;
+    }
+
+    function renderMap({ fitBounds = false } = {}) {
+      clearMapLayers();
+      const byArea = groupByArea(state.locations);
+
+      for (const [area, areaLocs] of Object.entries(byArea)) {
+        const color = getColor(area);
+        const boundary = getBoundary(area);
+        const areaState = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
+
+        if (boundary) {
+          const polygon = L.polygon(boundary, {
+            color,
+            fillColor: color,
+            fillOpacity: 0.12,
+            weight: 2,
+            dashArray: '6, 3'
+          }).addTo(map);
+          polygon.bindTooltip(area, { sticky: true, className: 'location-label' });
+          areaState.polygon = polygon;
+
+          const center = polygon.getBounds().getCenter();
+          areaState.areaLabel = L.marker(center, {
+            icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
+          }).addTo(map);
+        }
+
+        for (const loc of areaLocs) {
+          const radius = loc.status === 'bad' ? 7 : 5;
+          const fillOpacity = loc.status === 'unreviewed' ? 0.58 : 0.85;
+          const weight = loc.status === 'bad' ? 3 : 1;
+          const strokeColor = loc.status === 'bad' ? '#fff' : color;
+
+          const marker = L.circleMarker([loc.lat, loc.lon], {
+            radius,
+            fillColor: color,
+            color: strokeColor,
+            weight,
+            fillOpacity
+          }).addTo(map);
+
+          marker.bindPopup(createPopupHtml(loc));
+          marker.on('click', () => selectLocation(loc.name, true));
+
+          areaState.markers.push({ marker, loc });
+          state.allMarkers.push({ marker, loc });
+          state.markerByName[loc.name] = marker;
+
+          const label = L.marker([loc.lat, loc.lon], {
+            icon: L.divIcon({
+              className: 'location-label',
+              html: `<span>${escapeHtml(loc.name)}</span>`,
+              iconSize: [90, 14],
+              iconAnchor: [45, -6]
+            })
+          });
+          areaState.labels.push(label);
+        }
+
+        state.areaState[area] = areaState;
+      }
+
+      updateLocationLabels();
+      updateAreaLabels();
+      applySearchFilter();
+
+      if (fitBounds) {
+        const layers = state.allMarkers.map(entry => entry.marker);
+        if (layers.length > 0) {
+          map.fitBounds(L.featureGroup(layers).getBounds().pad(0.1));
+        }
+      }
+    }
+
+    function renderStats() {
+      const total = state.locations.length;
+      const ok = state.locations.filter(loc => loc.status === 'ok').length;
+      const bad = state.locations.filter(loc => loc.status === 'bad').length;
+      const byArea = groupByArea(state.locations);
+
+      document.getElementById('total-count').textContent = total;
+      document.getElementById('area-count').textContent = Object.keys(byArea).length;
+      document.getElementById('ok-count').textContent = ok;
+      document.getElementById('bad-count').textContent = bad;
+    }
+
+    function renderLegend() {
+      const legendItems = document.getElementById('legend-items');
+      legendItems.innerHTML = '';
+      const byArea = groupByArea(state.locations);
+
+      for (const [area, areaLocs] of Object.entries(byArea)) {
+        const color = getColor(area);
+        const badCount = areaLocs.filter(loc => loc.status === 'bad').length;
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+          <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${escapeHtml(area)}"></span>
+          <span class="legend-dot" style="background:${color}"></span>
+          <span class="legend-name">${escapeHtml(area)}</span>
+          <span class="legend-count">${areaLocs.length}${badCount > 0 ? ` | ${badCount} לא תקינות` : ''}</span>
+          <button class="legend-zoom" data-area="${escapeHtml(area)}" title="זום לאזור">⊕</button>
+        `;
+
+        item.querySelector('.legend-checkbox').addEventListener('click', (event) => {
+          const checkbox = event.target;
+          const targetArea = checkbox.dataset.area;
+          const isChecked = checkbox.classList.toggle('checked');
+          item.classList.toggle('hidden-area', !isChecked);
+          toggleArea(targetArea, isChecked);
+        });
+
+        item.querySelector('.legend-zoom').addEventListener('click', (event) => {
+          event.stopPropagation();
+          const targetArea = event.target.dataset.area;
+          const targetState = state.areaState[targetArea];
+          if (!targetState) return;
+          if (!targetState.visible) {
+            item.querySelector('.legend-checkbox').classList.add('checked');
+            item.classList.remove('hidden-area');
+            toggleArea(targetArea, true);
+          }
+          const layers = [
+            ...(targetState.polygon ? [targetState.polygon] : []),
+            ...targetState.markers.map(entry => entry.marker)
+          ];
+          if (layers.length > 0) {
+            map.fitBounds(L.featureGroup(layers).getBounds().pad(0.1));
+          }
+        });
+
+        legendItems.appendChild(item);
+      }
+    }
+
+    function renderInvalidList() {
+      const list = document.getElementById('invalid-list');
+      const invalidLocations = state.locations
+        .filter(loc => loc.status === 'bad')
+        .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+
+      if (invalidLocations.length === 0) {
+        list.innerHTML = '<div class="invalid-empty">אין כרגע מיקומים שסומנו כלא תקינים.</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      for (const loc of invalidLocations) {
+        const item = document.createElement('div');
+        item.className = 'invalid-item';
+        item.innerHTML = `
+          <div><strong>${escapeHtml(loc.name)}</strong></div>
+          <div>אזור מקור: ${escapeHtml(loc.area)}</div>
+          <div>אזור חדש: ${escapeHtml(loc.assigned_area || '-')}</div>
+        `;
+        item.addEventListener('click', () => selectLocation(loc.name, true));
+        list.appendChild(item);
+      }
+    }
+
+    function renderReviewPanel() {
+      const container = document.getElementById('review-content');
+      const loc = state.locations.find(entry => entry.name === state.selectedLocationName);
+
+      if (!loc) {
+        container.className = 'review-empty';
+        container.textContent = 'לחץ על נקודה במפה כדי לעדכן סטטוס ולשייך אזור במידת הצורך.';
+        return;
+      }
+
+      const areaOptions = state.areas
+        .filter(area => area !== loc.area)
+        .map(area => `<option value="${escapeHtml(area)}" ${loc.assigned_area === area ? 'selected' : ''}>${escapeHtml(area)}</option>`)
+        .join('');
+
+      container.className = '';
+      container.innerHTML = `
+        <div class="review-meta">
+          <div><strong>${escapeHtml(loc.name)}</strong></div>
+          <div>אזור מקור: ${escapeHtml(loc.area)}</div>
+          <div>אזור מוצג: ${escapeHtml(getEffectiveArea(loc))}</div>
+          <div>${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</div>
+        </div>
+        <div class="review-status ${getStatusClass(loc.status)}">${escapeHtml(getStatusText(loc.status))}</div>
+        <div class="form-row">
+          <label class="form-label" for="status-select">סטטוס</label>
+          <select id="status-select" class="form-select">
+            <option value="unreviewed" ${loc.status === 'unreviewed' ? 'selected' : ''}>טרם נבדק</option>
+            <option value="ok" ${loc.status === 'ok' ? 'selected' : ''}>תקין</option>
+            <option value="bad" ${loc.status === 'bad' ? 'selected' : ''}>לא תקין</option>
+          </select>
+        </div>
+        <div class="form-row" id="assigned-area-row" style="${loc.status === 'bad' ? '' : 'display:none;'}">
+          <label class="form-label" for="assigned-area-select">אזור חדש</label>
+          <select id="assigned-area-select" class="form-select">
+            <option value="">בחר אזור חדש</option>
+            ${areaOptions}
+          </select>
+          <div class="status-hint">אם המיקום לא תקין, חובה לבחור לו אזור אחר מהאזור המקורי.</div>
+        </div>
+        <button id="save-location-btn" class="save-btn">שמור</button>
+      `;
+
+      const statusSelect = document.getElementById('status-select');
+      const assignedAreaRow = document.getElementById('assigned-area-row');
+
+      statusSelect.addEventListener('change', () => {
+        assignedAreaRow.style.display = statusSelect.value === 'bad' ? '' : 'none';
+      });
+
+      document.getElementById('save-location-btn').addEventListener('click', saveSelectedLocation);
+    }
+
+    function applySearchFilter() {
+      const query = state.searchQuery.trim().toLowerCase();
+      for (const { marker, loc } of state.allMarkers) {
+        const matches = !query
+          || loc.name.toLowerCase().includes(query)
+          || getEffectiveArea(loc).toLowerCase().includes(query)
+          || loc.area.toLowerCase().includes(query);
+        marker.setStyle({
+          opacity: matches ? 1 : 0.08,
+          fillOpacity: matches ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08
+        });
       }
     }
 
     function buildShareText() {
-      if (!appData) return '';
-      const { locs, issues, byArea } = appData;
+      const total = state.locations.length;
+      const ok = state.locations.filter(loc => loc.status === 'ok').length;
+      const bad = state.locations.filter(loc => loc.status === 'bad').length;
+      const unreviewed = state.locations.filter(loc => loc.status === 'unreviewed').length;
+      const byArea = groupByArea(state.locations);
+
       let text = `📍 *מיפוי פוטנציאל לפי אזורים - סיכום*\n\n`;
-      text += `📍 סה"כ מיקומים: ${locs.length}\n`;
-      text += `🟢 תקינים: ${locs.length - issues.length}\n`;
-      text += `🔴 חריגים: ${issues.length}\n\n`;
-      text += `*אזורים:*\n`;
+      text += `📍 סה"כ מיקומים: ${total}\n`;
+      text += `🟢 תקינים: ${ok}\n`;
+      text += `🔴 לא תקינים: ${bad}\n`;
+      text += `⚪ טרם נבדקו: ${unreviewed}\n\n`;
+      text += `*אזורים מוצגים:*\n`;
       for (const [area, areaLocs] of Object.entries(byArea)) {
-        const areaIssues = areaLocs.filter(l => l.issue).length;
-        text += `• ${area}: ${areaLocs.length} מיקומים`;
-        if (areaIssues > 0) text += ` (${areaIssues} חריגים)`;
-        text += `\n`;
+        text += `• ${area}: ${areaLocs.length} מיקומים\n`;
       }
-      if (issues.length > 0) {
-        text += `\n*מיקומים חריגים:*\n`;
-        for (const loc of issues) text += `🔴 ${loc.name} (משויך: ${loc.area})\n`;
+
+      const invalidLocations = state.locations.filter(loc => loc.status === 'bad');
+      if (invalidLocations.length > 0) {
+        text += `\n*מיקומים לא תקינים:*\n`;
+        for (const loc of invalidLocations) {
+          text += `🔴 ${loc.name} (${loc.area} → ${loc.assigned_area})\n`;
+        }
       }
+
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         text += `\n🔗 ${window.location.href}`;
       }
       return text;
     }
 
-    fetch('locations.json')
-      .then(r => r.json())
-      .then(data => {
-        const locs = data.locations;
-        const byArea = {};
-        for (const loc of locs) {
-          if (!byArea[loc.area]) byArea[loc.area] = [];
-          byArea[loc.area].push(loc);
-        }
+    function renderAll({ fitBounds = false } = {}) {
+      renderMap({ fitBounds });
+      renderStats();
+      renderLegend();
+      renderInvalidList();
+      renderReviewPanel();
+    }
 
-        // Check each location against its area's boundary polygon
-        const issues = [];
-        for (const loc of locs) {
-          const boundary = AREA_BOUNDARIES[loc.area];
-          if (boundary) {
-            const inside = pointInBoundary([loc.lat, loc.lon], boundary);
-            if (!inside) {
-              loc.issue = true;
-              issues.push(loc);
-            }
-          }
-        }
+    function selectLocation(name, focusMap = false) {
+      state.selectedLocationName = name;
+      renderReviewPanel();
 
-        appData = { locs, issues, byArea };
-
-        // Draw areas and location markers even when a boundary file is missing for some areas
-        for (const [area, areaLocs] of Object.entries(byArea)) {
-          const color = AREA_COLORS[area] || '#888';
-          const boundary = AREA_BOUNDARIES[area];
-          const state = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
-
-          if (boundary) {
-            // Draw the area polygon (handles both simple and multi-polygon)
-            const poly = L.polygon(boundary, {
-              color, fillColor: color, fillOpacity: 0.12, weight: 2, dashArray: '6, 3'
-            }).addTo(map);
-            poly.bindTooltip(area, { sticky: true, className: 'location-label' });
-            state.polygon = poly;
-
-            // Area label at polygon center
-            const center = poly.getBounds().getCenter();
-            state.areaLabel = L.marker(center, {
-              icon: L.divIcon({ className: 'area-label', html: area, iconSize: [120, 20], iconAnchor: [60, 10] })
-            }).addTo(map);
-          }
-
-          // Location markers
-          for (const loc of areaLocs) {
-            const isIssue = loc.issue;
-            const mColor = color;
-            const radius = 5;
-            const weight = 1;
-
-            const circle = L.circleMarker([loc.lat, loc.lon], {
-              radius, fillColor: mColor,
-              color: mColor,
-              weight, fillOpacity: 0.8
-            }).addTo(map);
-
-            const statusClass = isIssue ? 'bad' : 'ok';
-            const statusText = isIssue
-              ? `⚠️ חריג — משויך ל"${loc.area}" אבל לא נמצא בגבולות האזור`
-              : '✓ תקין — נמצא בגבולות האזור';
-            circle.bindPopup(`
-              <div class="popup-title">${loc.name}</div>
-              <div class="popup-area">אזור משויך: ${loc.area}</div>
-              <div class="popup-status ${statusClass}">${statusText}</div>
-              <div style="font-size:11px;color:#666;margin-top:4px">${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</div>
-            `);
-
-            state.markers.push({ marker: circle, loc });
-            allMarkers.push({ marker: circle, loc });
-            if (isIssue) issueMarkers.push({ marker: circle, loc });
-
-            // Location label
-            const labelColor = '#ccc';
-            const label = L.marker([loc.lat, loc.lon], {
-              icon: L.divIcon({
-                className: 'location-label',
-                html: `<span style="color:${labelColor}">${loc.name}</span>`,
-                iconSize: [80, 14], iconAnchor: [40, -6]
-              })
-            });
-            state.labels.push(label);
-          }
-
-          areaState[area] = state;
-        }
-
-        const visibleLayers = allMarkers.map(({ marker }) => marker);
-        const visiblePolygons = Object.values(areaState).flatMap(s => s.polygon ? [s.polygon] : []);
-        const boundsLayers = [...visibleLayers, ...visiblePolygons];
-        if (boundsLayers.length > 0) {
-          map.fitBounds(L.featureGroup(boundsLayers).getBounds().pad(0.1));
-        }
-
-        // Stats
-        document.getElementById('total-count').textContent = locs.length;
-        document.getElementById('area-count').textContent = Object.keys(byArea).length;
-        document.getElementById('ok-count').textContent = locs.length - issues.length;
-        document.getElementById('issue-count').textContent = issues.length;
-
-        // Legend
-        const legendItems = document.getElementById('legend-items');
-        for (const [area, areaLocs] of Object.entries(byArea)) {
-          const color = AREA_COLORS[area] || '#888';
-          const areaIssues = areaLocs.filter(l => l.issue).length;
-          const item = document.createElement('div');
-          item.className = 'legend-item';
-          item.innerHTML = `
-            <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${area}"></span>
-            <span class="legend-dot" style="background:${color}"></span>
-            <span class="legend-name">${area}</span>
-            <span class="legend-count">${areaLocs.length}${areaIssues > 0 ? ` <span style="color:#e94560">(${areaIssues}🔴)</span>` : ''}</span>
-            <button class="legend-zoom" data-area="${area}" title="זום לאזור">⊕</button>
-          `;
-          item.querySelector('.legend-checkbox').addEventListener('click', (e) => {
-            const cb = e.target, a = cb.dataset.area;
-            const isChecked = cb.classList.toggle('checked');
-            item.classList.toggle('hidden-area', !isChecked);
-            toggleArea(a, isChecked);
-          });
-          item.querySelector('.legend-zoom').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const a = e.target.dataset.area, s = areaState[a];
-            if (!s.visible) {
-              item.querySelector('.legend-checkbox').classList.add('checked');
-              item.classList.remove('hidden-area');
-              toggleArea(a, true);
-            }
-            if (s.polygon) {
-              map.fitBounds(s.polygon.getBounds(), { padding: [50, 50] });
+      const marker = state.markerByName[name];
+      const loc = state.locations.find(entry => entry.name === name);
+      if (focusMap && marker && loc) {
+        const area = getEffectiveArea(loc);
+        const areaState = state.areaState[area];
+        if (areaState && !areaState.visible) {
+          toggleArea(area, true);
+          document.querySelectorAll('.legend-checkbox').forEach((checkbox) => {
+            if (checkbox.dataset.area === area) {
+              checkbox.classList.add('checked');
+              checkbox.closest('.legend-item')?.classList.remove('hidden-area');
             }
           });
-          legendItems.appendChild(item);
+        }
+        map.setView([loc.lat, loc.lon], Math.max(map.getZoom(), 10));
+        marker.openPopup();
+      }
+    }
+
+    async function saveSelectedLocation() {
+      const loc = state.locations.find(entry => entry.name === state.selectedLocationName);
+      if (!loc) return;
+
+      const saveButton = document.getElementById('save-location-btn');
+      const status = document.getElementById('status-select').value;
+      const assignedArea = document.getElementById('assigned-area-select')?.value || null;
+
+      if (status === 'bad' && (!assignedArea || assignedArea === loc.area)) {
+        window.alert('אם המיקום לא תקין צריך לבחור אזור אחר מהאזור המקורי.');
+        return;
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = 'שומר...';
+
+      try {
+        const response = await fetch(`/api/locations/${encodeURIComponent(loc.name)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status,
+            assigned_area: status === 'bad' ? assignedArea : null
+          })
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          throw new Error(errorPayload.error || 'שמירה נכשלה');
         }
 
-        document.getElementById('show-all-areas').addEventListener('click', () => {
-          legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
-            cb.classList.add('checked'); cb.closest('.legend-item').classList.remove('hidden-area');
-          });
-          for (const a of Object.keys(areaState)) toggleArea(a, true);
-        });
-        document.getElementById('hide-all-areas').addEventListener('click', () => {
-          legendItems.querySelectorAll('.legend-checkbox').forEach(cb => {
-            cb.classList.remove('checked'); cb.closest('.legend-item').classList.add('hidden-area');
-          });
-          for (const a of Object.keys(areaState)) toggleArea(a, false);
-        });
+        const updatedLocation = await response.json();
+        state.locations = state.locations.map(entry => entry.name === updatedLocation.name ? updatedLocation : entry);
+        renderAll();
+        selectLocation(updatedLocation.name, false);
+      } catch (error) {
+        console.error('Failed to save location state:', error);
+        window.alert(error.message || 'שמירה נכשלה');
+      } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'שמור';
+      }
+    }
 
-        // Issues list
-        const issuesList = document.getElementById('issues-list');
-        if (issues.length === 0) {
-          issuesList.innerHTML = '<div style="color:#4caf50;font-size:12px">אין מיקומים חריגים 🎉</div>';
-        } else {
-          for (const loc of issues) {
-            const item = document.createElement('div');
-            item.className = 'issue-item';
-            item.textContent = `${loc.name} → ${loc.area}`;
-            item.addEventListener('click', () => {
-              map.setView([loc.lat, loc.lon], 12);
-              const m = issueMarkers.find(im => im.loc === loc);
-              if (m) m.marker.openPopup();
-            });
-            issuesList.appendChild(item);
-          }
-        }
+    async function loadLocations() {
+      const response = await fetch('/api/locations');
+      if (!response.ok) throw new Error('Failed to load locations');
+      return response.json();
+    }
 
-        // Search
-        document.getElementById('search').addEventListener('input', (e) => {
-          const q = e.target.value.trim().toLowerCase();
-          for (const { marker, loc } of allMarkers) {
-            const match = !q || loc.name.toLowerCase().includes(q) || loc.area.toLowerCase().includes(q);
-            marker.setStyle({ opacity: match ? 1 : 0.1, fillOpacity: match ? 0.8 : 0.1 });
-          }
-        });
+    document.getElementById('search').addEventListener('input', (event) => {
+      state.searchQuery = event.target.value;
+      applySearchFilter();
+    });
 
-        document.getElementById('toggle-labels').addEventListener('change', (e) => {
-          showLocationLabels = e.target.checked; updateLocationLabels();
-        });
-        document.getElementById('toggle-area-labels').addEventListener('change', (e) => {
-          showAreaLabels = e.target.checked; updateAreaLabels();
-        });
-        document.getElementById('share-whatsapp').addEventListener('click', () => {
-          const text = buildShareText();
-          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-        });
+    document.getElementById('toggle-labels').addEventListener('change', (event) => {
+      state.showLocationLabels = event.target.checked;
+      updateLocationLabels();
+    });
+
+    document.getElementById('toggle-area-labels').addEventListener('change', (event) => {
+      state.showAreaLabels = event.target.checked;
+      updateAreaLabels();
+    });
+
+    document.getElementById('show-all-areas').addEventListener('click', () => {
+      document.querySelectorAll('.legend-checkbox').forEach(checkbox => {
+        checkbox.classList.add('checked');
+        checkbox.closest('.legend-item').classList.remove('hidden-area');
+      });
+      Object.keys(state.areaState).forEach(area => toggleArea(area, true));
+    });
+
+    document.getElementById('hide-all-areas').addEventListener('click', () => {
+      document.querySelectorAll('.legend-checkbox').forEach(checkbox => {
+        checkbox.classList.remove('checked');
+        checkbox.closest('.legend-item').classList.add('hidden-area');
+      });
+      Object.keys(state.areaState).forEach(area => toggleArea(area, false));
+    });
+
+    document.getElementById('share-whatsapp').addEventListener('click', () => {
+      const text = buildShareText();
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    });
+
+    loadLocations()
+      .then((payload) => {
+        state.locations = payload.locations;
+        state.areas = payload.areas;
+        renderAll({ fitBounds: true });
       })
-      .catch(err => {
-        console.error('Failed to load locations:', err);
-        document.getElementById('issues-list').innerHTML =
-          '<div style="color:#e94560">Error loading data.</div>';
+      .catch((error) => {
+        console.error('Failed to load app data:', error);
+        document.getElementById('review-content').textContent = 'שגיאה בטעינת הנתונים.';
+        document.getElementById('invalid-list').innerHTML = '<div class="invalid-empty">שגיאה בטעינת הנתונים.</div>';
       });
   </script>
 </body>
