@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from uuid import uuid4
 from urllib.parse import unquote, urlparse
 
 try:
@@ -64,6 +65,22 @@ def init_postgres():
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS review_history (
+                  id BIGSERIAL PRIMARY KEY,
+                  revision_group TEXT NOT NULL,
+                  name TEXT NOT NULL,
+                  previous_status TEXT NOT NULL,
+                  previous_assigned_area TEXT,
+                  new_status TEXT NOT NULL,
+                  new_assigned_area TEXT,
+                  changed_at TEXT NOT NULL,
+                  action TEXT NOT NULL DEFAULT 'update',
+                  restored_from_id BIGINT
+                )
+                """
+            )
         conn.commit()
 
 
@@ -77,6 +94,22 @@ def init_sqlite():
               status TEXT NOT NULL DEFAULT 'unreviewed',
               assigned_area TEXT,
               updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS review_history (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              revision_group TEXT NOT NULL,
+              name TEXT NOT NULL,
+              previous_status TEXT NOT NULL,
+              previous_assigned_area TEXT,
+              new_status TEXT NOT NULL,
+              new_assigned_area TEXT,
+              changed_at TEXT NOT NULL,
+              action TEXT NOT NULL DEFAULT 'update',
+              restored_from_id INTEGER
             )
             """
         )
@@ -115,7 +148,136 @@ def fetch_reviews():
     return [dict(row) for row in rows]
 
 
-def save_review(name, status, assigned_area, updated_at):
+def get_review(name):
+    if using_postgres():
+        with get_postgres_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT name, status, assigned_area, updated_at
+                    FROM location_reviews
+                    WHERE name = %s
+                    """,
+                    (name,),
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "name": row[0],
+            "status": row[1],
+            "assigned_area": row[2],
+            "updated_at": row[3],
+        }
+
+    with get_sqlite_db() as conn:
+        row = conn.execute(
+            """
+            SELECT name, status, assigned_area, updated_at
+            FROM location_reviews
+            WHERE name = ?
+            """,
+            (name,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def fetch_review_history(limit=30):
+    if using_postgres():
+        with get_postgres_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, revision_group, name, previous_status, previous_assigned_area,
+                           new_status, new_assigned_area, changed_at, action, restored_from_id
+                    FROM review_history
+                    ORDER BY id DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+                rows = cur.fetchall()
+        return [
+            {
+                "id": row[0],
+                "revision_group": row[1],
+                "name": row[2],
+                "previous_status": row[3],
+                "previous_assigned_area": row[4],
+                "new_status": row[5],
+                "new_assigned_area": row[6],
+                "changed_at": row[7],
+                "action": row[8],
+                "restored_from_id": row[9],
+            }
+            for row in rows
+        ]
+
+    with get_sqlite_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, revision_group, name, previous_status, previous_assigned_area,
+                   new_status, new_assigned_area, changed_at, action, restored_from_id
+            FROM review_history
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_history_entry(entry_id):
+    if using_postgres():
+        with get_postgres_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, revision_group, name, previous_status, previous_assigned_area,
+                           new_status, new_assigned_area, changed_at, action, restored_from_id
+                    FROM review_history
+                    WHERE id = %s
+                    """,
+                    (entry_id,),
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "revision_group": row[1],
+            "name": row[2],
+            "previous_status": row[3],
+            "previous_assigned_area": row[4],
+            "new_status": row[5],
+            "new_assigned_area": row[6],
+            "changed_at": row[7],
+            "action": row[8],
+            "restored_from_id": row[9],
+        }
+
+    with get_sqlite_db() as conn:
+        row = conn.execute(
+            """
+            SELECT id, revision_group, name, previous_status, previous_assigned_area,
+                   new_status, new_assigned_area, changed_at, action, restored_from_id
+            FROM review_history
+            WHERE id = ?
+            """,
+            (entry_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def save_review(name, status, assigned_area, updated_at, action="update", restored_from_id=None, revision_group=None):
+    previous = get_review(name) or {
+        "name": name,
+        "status": "unreviewed",
+        "assigned_area": None,
+        "updated_at": None,
+    }
+    revision_group = revision_group or str(uuid4())
+
     if using_postgres():
         with get_postgres_db() as conn:
             with conn.cursor() as cur:
@@ -129,6 +291,26 @@ def save_review(name, status, assigned_area, updated_at):
                       updated_at = EXCLUDED.updated_at
                     """,
                     (name, status, assigned_area, updated_at),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO review_history (
+                      revision_group, name, previous_status, previous_assigned_area,
+                      new_status, new_assigned_area, changed_at, action, restored_from_id
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        revision_group,
+                        name,
+                        previous["status"],
+                        previous["assigned_area"],
+                        status,
+                        assigned_area,
+                        updated_at,
+                        action,
+                        restored_from_id,
+                    ),
                 )
             conn.commit()
         return
@@ -144,6 +326,26 @@ def save_review(name, status, assigned_area, updated_at):
               updated_at = excluded.updated_at
             """,
             (name, status, assigned_area, updated_at),
+        )
+        conn.execute(
+            """
+            INSERT INTO review_history (
+              revision_group, name, previous_status, previous_assigned_area,
+              new_status, new_assigned_area, changed_at, action, restored_from_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                revision_group,
+                name,
+                previous["status"],
+                previous["assigned_area"],
+                status,
+                assigned_area,
+                updated_at,
+                action,
+                restored_from_id,
+            ),
         )
 
 
@@ -196,10 +398,65 @@ class AppHandler(SimpleHTTPRequestHandler):
                 },
             )
 
+        if parsed.path == "/api/history":
+            return self.end_json(
+                200,
+                {
+                    "history": fetch_review_history(),
+                },
+            )
+
         if parsed.path == "/api/health":
             return self.end_json(200, {"ok": True})
 
         return super().do_GET()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        prefix = "/api/history/"
+        if not parsed.path.startswith(prefix) or not parsed.path.endswith("/restore"):
+            return self.end_json(404, {"error": "Not found"})
+
+        history_id = parsed.path[len(prefix):-len("/restore")]
+        try:
+            history_id = int(history_id)
+        except ValueError:
+            return self.end_json(400, {"error": "Invalid history id"})
+
+        entry = get_history_entry(history_id)
+        if not entry:
+            return self.end_json(404, {"error": "History entry not found"})
+
+        name = entry["name"]
+        if name not in BASE_LOCATION_BY_NAME:
+            return self.end_json(404, {"error": "Unknown location"})
+
+        updated_at = utc_now()
+        save_review(
+            name,
+            entry["previous_status"],
+            entry["previous_assigned_area"],
+            updated_at,
+            action="restore",
+            restored_from_id=history_id,
+        )
+
+        loc = BASE_LOCATION_BY_NAME[name]
+        status = entry["previous_status"]
+        assigned_area = entry["previous_assigned_area"]
+        return self.end_json(
+            200,
+            {
+                "location": {
+                    **loc,
+                    "status": status,
+                    "assigned_area": assigned_area,
+                    "effective_area": assigned_area if status == "bad" and assigned_area else loc["area"],
+                    "updated_at": updated_at,
+                },
+                "history": fetch_review_history(),
+            },
+        )
 
     def do_PATCH(self):
         parsed = urlparse(self.path)
