@@ -32,8 +32,31 @@
       font-size: 13px;
     }
     .stat-box { background: rgba(255,255,255,0.04); padding: 10px; border-radius: 8px; }
+    .stat-box.filterable { cursor: pointer; transition: background 0.2s, border-color 0.2s; border: 1px solid transparent; }
+    .stat-box.filterable:hover { background: rgba(255,255,255,0.08); }
+    .stat-box.active-filter { border-color: rgba(255,255,255,0.24); background: rgba(255,255,255,0.1); }
     .stat-val { font-size: 20px; font-weight: bold; color: #e94560; }
     .stat-label { color: #aaa; font-size: 11px; }
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .filter-pill {
+      border: 1px solid #334;
+      background: #1a1a2e;
+      color: #cfd8e3;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .filter-pill.active {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.28);
+      color: #fff;
+    }
     .search-box, .form-select {
       width: 100%; padding: 8px 12px; border-radius: 6px;
       border: 1px solid #294264; background: #1a1a2e; color: #eee; font-size: 13px;
@@ -317,10 +340,16 @@
 
       <div class="panel">
         <div class="stats">
-          <div class="stat-box"><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
+          <div class="stat-box filterable" data-status-filter="all"><div class="stat-val" id="total-count">0</div><div class="stat-label">סה״כ מיקומים</div></div>
           <div class="stat-box"><div class="stat-val" id="area-count">0</div><div class="stat-label">אזורים</div></div>
-          <div class="stat-box"><div class="stat-val" id="ok-count" style="color:#7ce38a">0</div><div class="stat-label">תקינים</div></div>
-          <div class="stat-box"><div class="stat-val" id="bad-count" style="color:#ff889b">0</div><div class="stat-label">לא תקינים</div></div>
+          <div class="stat-box filterable" data-status-filter="ok"><div class="stat-val" id="ok-count" style="color:#7ce38a">0</div><div class="stat-label">תקינים</div></div>
+          <div class="stat-box filterable" data-status-filter="bad"><div class="stat-val" id="bad-count" style="color:#ff889b">0</div><div class="stat-label">לא תקינים</div></div>
+        </div>
+        <div class="filter-actions">
+          <button type="button" class="filter-pill active" data-status-filter-button="all">הכל</button>
+          <button type="button" class="filter-pill" data-status-filter-button="unreviewed">טרם נבדק</button>
+          <button type="button" class="filter-pill" data-status-filter-button="ok">תקין</button>
+          <button type="button" class="filter-pill" data-status-filter-button="bad">לא תקין</button>
         </div>
       </div>
 
@@ -408,7 +437,10 @@
       searchQuery: '',
       dataMode: 'production',
       importedFileName: null,
-      multiSelectMode: false
+      multiSelectMode: false,
+      statusFilter: 'all',
+      highlightedArea: null,
+      highlightedAreaLayer: null
     };
 
     function escapeHtml(value) {
@@ -422,6 +454,10 @@
 
     function getBoundary(area) {
       return typeof AREA_BOUNDARIES === 'object' && AREA_BOUNDARIES ? AREA_BOUNDARIES[area] : null;
+    }
+
+    function matchesStatusFilter(loc) {
+      return state.statusFilter === 'all' || loc.status === state.statusFilter;
     }
 
     function getEffectiveArea(loc) {
@@ -599,10 +635,11 @@
           || loc.name.toLowerCase().includes(query)
           || getEffectiveArea(loc).toLowerCase().includes(query)
           || loc.area.toLowerCase().includes(query);
+        const matchesStatus = matchesStatusFilter(loc);
         const isSelected = isLocationSelected(loc.name);
         marker.setStyle({
-          opacity: matches ? 1 : 0.08,
-          fillOpacity: matches ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08,
+          opacity: matches && matchesStatus ? 1 : 0.08,
+          fillOpacity: matches && matchesStatus ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08,
           weight: isSelected ? 4 : (loc.status === 'bad' ? 3 : 1),
           color: isSelected ? '#ffffff' : (loc.status === 'bad' ? '#fff' : getColor(getEffectiveArea(loc))),
           radius: isSelected ? 9 : (loc.status === 'bad' ? 7 : 5)
@@ -612,6 +649,113 @@
           markerElement.classList.toggle('marker-selected', isSelected);
         }
       }
+    }
+
+    function buildConvexHull(points) {
+      const unique = [];
+      const seen = new Set();
+      for (const point of points) {
+        const key = `${point[0].toFixed(6)},${point[1].toFixed(6)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(point);
+        }
+      }
+      if (unique.length <= 1) return unique;
+      unique.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => ((a[0] - o[0]) * (b[1] - o[1])) - ((a[1] - o[1]) * (b[0] - o[0]));
+      const lower = [];
+      for (const point of unique) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop();
+        lower.push(point);
+      }
+      const upper = [];
+      for (let i = unique.length - 1; i >= 0; i -= 1) {
+        const point = unique[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop();
+        upper.push(point);
+      }
+      lower.pop();
+      upper.pop();
+      return lower.concat(upper);
+    }
+
+    function buildAreaOutline(areaLocs) {
+      if (!areaLocs || areaLocs.length === 0) return null;
+      const predefined = getBoundary(getEffectiveArea(areaLocs[0]));
+      if (predefined && predefined.length >= 3) return predefined;
+
+      const points = areaLocs.map((loc) => [loc.lon, loc.lat]);
+      if (points.length === 1) {
+        const [lon, lat] = points[0];
+        const pad = 0.06;
+        return [
+          [lat - pad, lon],
+          [lat, lon + pad],
+          [lat + pad, lon],
+          [lat, lon - pad]
+        ];
+      }
+
+      if (points.length === 2) {
+        const lats = points.map((point) => point[1]);
+        const lons = points.map((point) => point[0]);
+        const latPad = Math.max((Math.max(...lats) - Math.min(...lats)) * 0.45, 0.04);
+        const lonPad = Math.max((Math.max(...lons) - Math.min(...lons)) * 0.45, 0.04);
+        return [
+          [Math.min(...lats) - latPad, Math.min(...lons) - lonPad],
+          [Math.min(...lats) - latPad, Math.max(...lons) + lonPad],
+          [Math.max(...lats) + latPad, Math.max(...lons) + lonPad],
+          [Math.max(...lats) + latPad, Math.min(...lons) - lonPad]
+        ];
+      }
+
+      const hull = buildConvexHull(points);
+      return hull.map(([lon, lat]) => [lat, lon]);
+    }
+
+    function clearAreaHighlight() {
+      if (state.highlightedAreaLayer) {
+        map.removeLayer(state.highlightedAreaLayer);
+        state.highlightedAreaLayer = null;
+      }
+    }
+
+    function focusArea(area) {
+      const areaState = state.areaState[area];
+      if (!areaState) return;
+      if (state.highlightedArea === area) {
+        state.highlightedArea = null;
+        clearAreaHighlight();
+        renderLegend();
+        return;
+      }
+
+      state.highlightedArea = area;
+      clearAreaHighlight();
+      const outline = buildAreaOutline(areaState.markers.map(entry => entry.loc));
+      if (outline && outline.length >= 3) {
+        state.highlightedAreaLayer = L.polygon(outline, {
+          color: '#ffffff',
+          weight: 3,
+          fillOpacity: 0.02,
+          dashArray: '10, 6'
+        }).addTo(map);
+        const bounds = state.highlightedAreaLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds.pad(0.15));
+        }
+      }
+      renderLegend();
+    }
+
+    function updateStatusFilterUI() {
+      document.querySelectorAll('[data-status-filter]').forEach((element) => {
+        element.classList.toggle('active-filter', element.dataset.statusFilter === state.statusFilter);
+      });
+      document.querySelectorAll('[data-status-filter-button]').forEach((element) => {
+        element.classList.toggle('active', element.dataset.statusFilterButton === state.statusFilter);
+      });
     }
 
     function groupByArea(locations) {
@@ -747,6 +891,13 @@
       updateLocationLabels();
       updateAreaLabels();
       updateMarkerStyles();
+      if (state.highlightedArea) {
+        const highlightedArea = state.highlightedArea;
+        state.highlightedArea = null;
+        focusArea(highlightedArea);
+      } else {
+        clearAreaHighlight();
+      }
 
       if (fitBounds) {
         const layers = state.allMarkers.map(entry => entry.marker);
@@ -766,6 +917,7 @@
       document.getElementById('area-count').textContent = Object.keys(byArea).length;
       document.getElementById('ok-count').textContent = ok;
       document.getElementById('bad-count').textContent = bad;
+      updateStatusFilterUI();
     }
 
     function renderLegend() {
@@ -777,7 +929,7 @@
         const color = getColor(area);
         const badCount = areaLocs.filter(loc => loc.status === 'bad').length;
         const item = document.createElement('div');
-        item.className = 'legend-item';
+        item.className = `legend-item${state.highlightedArea === area ? ' active-filter' : ''}`;
         item.innerHTML = `
           <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${escapeHtml(area)}"></span>
           <span class="legend-dot" style="background:${color}"></span>
@@ -787,6 +939,7 @@
         `;
 
         item.querySelector('.legend-checkbox').addEventListener('click', (event) => {
+          event.stopPropagation();
           const checkbox = event.target;
           const targetArea = checkbox.dataset.area;
           const isChecked = checkbox.classList.toggle('checked');
@@ -811,6 +964,10 @@
           if (layers.length > 0) {
             map.fitBounds(L.featureGroup(layers).getBounds().pad(0.1));
           }
+        });
+
+        item.addEventListener('click', () => {
+          focusArea(area);
         });
 
         legendItems.appendChild(item);
@@ -1232,6 +1389,15 @@
 
     document.getElementById('toggle-multi-select').addEventListener('change', (event) => {
       setMultiSelectMode(event.target.checked);
+    });
+
+    document.querySelectorAll('[data-status-filter], [data-status-filter-button]').forEach((element) => {
+      element.addEventListener('click', () => {
+        const nextFilter = element.dataset.statusFilter || element.dataset.statusFilterButton;
+        state.statusFilter = nextFilter;
+        updateStatusFilterUI();
+        updateMarkerStyles();
+      });
     });
 
     document.getElementById('show-all-areas').addEventListener('click', () => {
