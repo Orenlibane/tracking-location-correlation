@@ -129,11 +129,26 @@
     }
     .legend-name { flex: 1 1 110px; min-width: 0; word-break: break-word; }
     .legend-count { color: #8ea2b8; font-size: 11px; flex: 1 1 100%; padding-right: 24px; }
+    .legend-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: auto;
+    }
     .legend-zoom {
       background: none; border: 1px solid #334; color: #8ac0ff;
       font-size: 10px; padding: 1px 6px; border-radius: 3px; cursor: pointer;
     }
     .legend-zoom:hover { background: #1a2a4a; }
+    .legend-color-input {
+      width: 28px;
+      height: 20px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+    }
     .legend-controls { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
     .legend-controls button {
       flex: 1 1 120px; background: #1a1a2e; border: 1px solid #334; color: #aaa;
@@ -304,6 +319,9 @@
         margin-right: auto;
         padding: 4px 8px;
       }
+      .legend-actions {
+        margin-right: 0;
+      }
       .review-meta,
       .review-empty,
       .invalid-empty,
@@ -439,8 +457,9 @@
       importedFileName: null,
       multiSelectMode: false,
       statusFilter: 'all',
-      highlightedArea: null,
-      highlightedAreaLayer: null
+      highlightedAreas: [],
+      highlightedAreaLayers: {},
+      areaColors: { ...AREA_COLORS }
     };
 
     function escapeHtml(value) {
@@ -465,7 +484,28 @@
     }
 
     function getColor(area) {
-      return AREA_COLORS[area] || '#888';
+      return state.areaColors[area] || '#888';
+    }
+
+    function saveAreaColors() {
+      window.localStorage.setItem('mapTrackingAreaColors', JSON.stringify(state.areaColors));
+    }
+
+    function loadAreaColors() {
+      try {
+        const raw = window.localStorage.getItem('mapTrackingAreaColors');
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (saved && typeof saved === 'object') {
+          state.areaColors = { ...AREA_COLORS, ...saved };
+        }
+      } catch (error) {
+        console.warn('Failed to restore saved area colors:', error);
+      }
+    }
+
+    function isAreaHighlighted(area) {
+      return state.highlightedAreas.includes(area);
     }
 
     function getStatusClass(status) {
@@ -714,34 +754,42 @@
       return hull.map(([lon, lat]) => [lat, lon]);
     }
 
-    function clearAreaHighlight() {
-      if (state.highlightedAreaLayer) {
-        map.removeLayer(state.highlightedAreaLayer);
-        state.highlightedAreaLayer = null;
+    function clearAreaHighlight(area = null) {
+      if (area) {
+        if (state.highlightedAreaLayers[area]) {
+          map.removeLayer(state.highlightedAreaLayers[area]);
+          delete state.highlightedAreaLayers[area];
+        }
+        return;
       }
+
+      for (const layer of Object.values(state.highlightedAreaLayers)) {
+        map.removeLayer(layer);
+      }
+      state.highlightedAreaLayers = {};
     }
 
     function focusArea(area) {
       const areaState = state.areaState[area];
       if (!areaState) return;
-      if (state.highlightedArea === area) {
-        state.highlightedArea = null;
-        clearAreaHighlight();
+      if (isAreaHighlighted(area)) {
+        state.highlightedAreas = state.highlightedAreas.filter((entry) => entry !== area);
+        clearAreaHighlight(area);
         renderLegend();
         return;
       }
 
-      state.highlightedArea = area;
-      clearAreaHighlight();
+      state.highlightedAreas = [...state.highlightedAreas, area];
       const outline = buildAreaOutline(areaState.markers.map(entry => entry.loc));
       if (outline && outline.length >= 3) {
-        state.highlightedAreaLayer = L.polygon(outline, {
-          color: '#ffffff',
+        clearAreaHighlight(area);
+        state.highlightedAreaLayers[area] = L.polygon(outline, {
+          color: getColor(area),
           weight: 3,
           fillOpacity: 0.02,
           dashArray: '10, 6'
         }).addTo(map);
-        const bounds = state.highlightedAreaLayer.getBounds();
+        const bounds = state.highlightedAreaLayers[area].getBounds();
         if (bounds.isValid()) {
           map.fitBounds(bounds.pad(0.15));
         }
@@ -891,13 +939,10 @@
       updateLocationLabels();
       updateAreaLabels();
       updateMarkerStyles();
-      if (state.highlightedArea) {
-        const highlightedArea = state.highlightedArea;
-        state.highlightedArea = null;
-        focusArea(highlightedArea);
-      } else {
-        clearAreaHighlight();
-      }
+      const highlightedAreas = [...state.highlightedAreas];
+      state.highlightedAreas = [];
+      clearAreaHighlight();
+      highlightedAreas.forEach((area) => focusArea(area));
 
       if (fitBounds) {
         const layers = state.allMarkers.map(entry => entry.marker);
@@ -929,13 +974,16 @@
         const color = getColor(area);
         const badCount = areaLocs.filter(loc => loc.status === 'bad').length;
         const item = document.createElement('div');
-        item.className = `legend-item${state.highlightedArea === area ? ' active-filter' : ''}`;
+        item.className = `legend-item${isAreaHighlighted(area) ? ' active-filter' : ''}`;
         item.innerHTML = `
           <span class="legend-checkbox checked" style="border-color:${color};color:${color}" data-area="${escapeHtml(area)}"></span>
           <span class="legend-dot" style="background:${color}"></span>
           <span class="legend-name">${escapeHtml(area)}</span>
           <span class="legend-count">${areaLocs.length}${badCount > 0 ? ` | ${badCount} לא תקינות` : ''}</span>
-          <button class="legend-zoom" data-area="${escapeHtml(area)}" title="זום לאזור">⊕</button>
+          <span class="legend-actions">
+            <input class="legend-color-input" type="color" value="${escapeHtml(color)}" data-area-color="${escapeHtml(area)}" title="בחר צבע לאזור">
+            <button class="legend-zoom" data-area="${escapeHtml(area)}" title="זום לאזור">⊕</button>
+          </span>
         `;
 
         item.querySelector('.legend-checkbox').addEventListener('click', (event) => {
@@ -964,6 +1012,18 @@
           if (layers.length > 0) {
             map.fitBounds(L.featureGroup(layers).getBounds().pad(0.1));
           }
+        });
+
+        item.querySelector('[data-area-color]').addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
+
+        item.querySelector('[data-area-color]').addEventListener('input', (event) => {
+          event.stopPropagation();
+          const targetArea = event.target.dataset.areaColor;
+          state.areaColors[targetArea] = event.target.value;
+          saveAreaColors();
+          renderAll();
         });
 
         item.addEventListener('click', () => {
@@ -1441,6 +1501,7 @@
 
     loadLocations()
       .then((payload) => {
+        loadAreaColors();
         state.productionLocations = payload.locations.map(cloneLocation);
         state.productionAreas = [...payload.areas];
         setLocations(
