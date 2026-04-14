@@ -120,6 +120,56 @@
     .review-empty, .invalid-empty {
       color: #8ea2b8; font-size: 12px; line-height: 1.5;
     }
+    .selection-summary {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .selection-list {
+      margin-top: 8px;
+      max-height: 140px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .selection-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      font-size: 11px;
+    }
+    .selection-chip button {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.16);
+      color: #ffb7c2;
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 10px;
+    }
+    .selection-chip button:hover { background: rgba(255,255,255,0.08); }
+    .marker-selected {
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.8));
+    }
+    .batch-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .batch-actions .action-btn {
+      flex: 1 1 120px;
+      font-size: 12px;
+      padding: 8px 10px;
+    }
     .form-row { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
     .form-label { font-size: 12px; color: #8ea2b8; }
     .save-btn {
@@ -277,6 +327,7 @@
       <div class="toggle-row">
         <label><input type="checkbox" id="toggle-labels"> הצג שמות מיקומים</label>
         <label><input type="checkbox" id="toggle-area-labels" checked> שמות אזורים</label>
+        <label><input type="checkbox" id="toggle-multi-select"> בחירה מרובה</label>
       </div>
 
       <div class="panel">
@@ -348,6 +399,7 @@
       productionLocations: [],
       productionAreas: [],
       selectedLocationName: null,
+      selectedLocationNames: [],
       areaState: {},
       allMarkers: [],
       markerByName: {},
@@ -355,7 +407,8 @@
       showAreaLabels: true,
       searchQuery: '',
       dataMode: 'production',
-      importedFileName: null
+      importedFileName: null,
+      multiSelectMode: false
     };
 
     function escapeHtml(value) {
@@ -395,9 +448,43 @@
       state.locations = locations;
       state.areas = areas;
       if (preserveSelection && state.selectedLocationName && state.locations.some(entry => entry.name === state.selectedLocationName)) {
+        state.selectedLocationNames = state.selectedLocationNames.filter(name => state.locations.some(entry => entry.name === name));
         return;
       }
       state.selectedLocationName = null;
+      state.selectedLocationNames = [];
+    }
+
+    function getSelectedLocations() {
+      return state.selectedLocationNames
+        .map(name => state.locations.find(entry => entry.name === name))
+        .filter(Boolean);
+    }
+
+    function isLocationSelected(name) {
+      return state.selectedLocationNames.includes(name);
+    }
+
+    function clearMultiSelection() {
+      state.selectedLocationNames = [];
+    }
+
+    function toggleSelectedLocation(name) {
+      if (isLocationSelected(name)) {
+        state.selectedLocationNames = state.selectedLocationNames.filter(entry => entry !== name);
+      } else {
+        state.selectedLocationNames = [...state.selectedLocationNames, name];
+      }
+    }
+
+    function setMultiSelectMode(enabled) {
+      state.multiSelectMode = enabled;
+      if (!enabled) {
+        clearMultiSelection();
+      } else {
+        state.selectedLocationName = null;
+      }
+      renderAll();
     }
 
     function cloneLocation(loc) {
@@ -502,6 +589,28 @@
           המפה מציגה את הנתונים החיים מהשרת. אפשר לייצא צילום מצב ל-JSON או לטעון JSON לעבודה מקומית בלבד.
         `;
         resetButton.disabled = state.productionLocations.length === 0;
+      }
+    }
+
+    function updateMarkerStyles() {
+      const query = state.searchQuery.trim().toLowerCase();
+      for (const { marker, loc } of state.allMarkers) {
+        const matches = !query
+          || loc.name.toLowerCase().includes(query)
+          || getEffectiveArea(loc).toLowerCase().includes(query)
+          || loc.area.toLowerCase().includes(query);
+        const isSelected = isLocationSelected(loc.name);
+        marker.setStyle({
+          opacity: matches ? 1 : 0.08,
+          fillOpacity: matches ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08,
+          weight: isSelected ? 4 : (loc.status === 'bad' ? 3 : 1),
+          color: isSelected ? '#ffffff' : (loc.status === 'bad' ? '#fff' : getColor(getEffectiveArea(loc))),
+          radius: isSelected ? 9 : (loc.status === 'bad' ? 7 : 5)
+        });
+        const markerElement = marker.getElement();
+        if (markerElement) {
+          markerElement.classList.toggle('marker-selected', isSelected);
+        }
       }
     }
 
@@ -637,7 +746,7 @@
 
       updateLocationLabels();
       updateAreaLabels();
-      applySearchFilter();
+      updateMarkerStyles();
 
       if (fitBounds) {
         const layers = state.allMarkers.map(entry => entry.marker);
@@ -736,6 +845,79 @@
     function renderReviewPanel() {
       const container = document.getElementById('review-content');
       const loc = state.locations.find(entry => entry.name === state.selectedLocationName);
+      const selectedLocations = getSelectedLocations();
+
+      if (state.multiSelectMode) {
+        container.className = '';
+        if (selectedLocations.length === 0) {
+          container.innerHTML = `
+            <div class="review-empty">מצב בחירה מרובה פעיל. לחץ על נקודות במפה כדי לבחור כמה מיקומים ולעדכן אותם יחד.</div>
+          `;
+          return;
+        }
+
+        const areaOptions = state.areas
+          .map(area => `<option value="${escapeHtml(area)}">${escapeHtml(area)}</option>`)
+          .join('');
+
+        container.innerHTML = `
+          <div class="review-meta">
+            <div><strong>${selectedLocations.length} מיקומים נבחרו</strong></div>
+            <div>אפשר לעדכן לכולם יחד סטטוס, ובמקרה של "לא תקין" לבחור אזור חדש משותף.</div>
+          </div>
+          <div class="selection-summary">
+            <div><strong>מיקומים שנבחרו</strong></div>
+            <div class="selection-list">
+              ${selectedLocations.map(entry => `
+                <div class="selection-chip">
+                  <span>${escapeHtml(entry.name)} · ${escapeHtml(entry.area)}</span>
+                  <button type="button" data-remove-selected="${escapeHtml(entry.name)}">הסר</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="batch-status-select">סטטוס לכל הנבחרים</label>
+            <select id="batch-status-select" class="form-select">
+              <option value="unreviewed">טרם נבדק</option>
+              <option value="ok">תקין</option>
+              <option value="bad">לא תקין</option>
+            </select>
+          </div>
+          <div class="form-row" id="batch-assigned-area-row" style="display:none;">
+            <label class="form-label" for="batch-assigned-area-select">אזור חדש לכל הנבחרים</label>
+            <select id="batch-assigned-area-select" class="form-select">
+              <option value="">בחר אזור חדש</option>
+              ${areaOptions}
+            </select>
+            <div class="status-hint">אם בוחרים "לא תקין", האזור החדש חייב להיות שונה מהאזור המקורי של כל אחד מהמיקומים שנבחרו.</div>
+          </div>
+          <div class="batch-actions">
+            <button id="save-batch-btn" class="save-btn" style="margin-top:0;">שמור לכל הנבחרים</button>
+            <button id="clear-batch-selection-btn" class="action-btn secondary" type="button">נקה בחירה</button>
+          </div>
+        `;
+
+        const statusSelect = document.getElementById('batch-status-select');
+        const assignedAreaRow = document.getElementById('batch-assigned-area-row');
+        statusSelect.addEventListener('change', () => {
+          assignedAreaRow.style.display = statusSelect.value === 'bad' ? '' : 'none';
+        });
+        container.querySelectorAll('[data-remove-selected]').forEach((button) => {
+          button.addEventListener('click', () => {
+            toggleSelectedLocation(button.dataset.removeSelected);
+            renderReviewPanel();
+            updateMarkerStyles();
+          });
+        });
+        document.getElementById('clear-batch-selection-btn').addEventListener('click', () => {
+          clearMultiSelection();
+          renderReviewPanel();
+          updateMarkerStyles();
+        });
+        document.getElementById('save-batch-btn').addEventListener('click', saveSelectedLocationsBatch);
+        return;
+      }
 
       if (!loc) {
         container.className = 'review-empty';
@@ -787,17 +969,7 @@
     }
 
     function applySearchFilter() {
-      const query = state.searchQuery.trim().toLowerCase();
-      for (const { marker, loc } of state.allMarkers) {
-        const matches = !query
-          || loc.name.toLowerCase().includes(query)
-          || getEffectiveArea(loc).toLowerCase().includes(query)
-          || loc.area.toLowerCase().includes(query);
-        marker.setStyle({
-          opacity: matches ? 1 : 0.08,
-          fillOpacity: matches ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08
-        });
-      }
+      updateMarkerStyles();
     }
 
     function buildShareText() {
@@ -841,6 +1013,14 @@
     }
 
     function selectLocation(name, focusMap = false) {
+      if (state.multiSelectMode) {
+        toggleSelectedLocation(name);
+        state.selectedLocationName = null;
+        renderReviewPanel();
+        updateMarkerStyles();
+        return;
+      }
+
       state.selectedLocationName = name;
       renderReviewPanel();
 
@@ -861,6 +1041,16 @@
         map.setView([loc.lat, loc.lon], Math.max(map.getZoom(), 10));
         marker.openPopup();
       }
+    }
+
+    function applyLocationUpdate(loc, status, assignedArea) {
+      return {
+        ...loc,
+        status,
+        assigned_area: status === 'bad' ? assignedArea : null,
+        effective_area: status === 'bad' ? assignedArea : loc.area,
+        updated_at: new Date().toISOString()
+      };
     }
 
     async function saveSelectedLocation() {
@@ -921,6 +1111,69 @@
       }
     }
 
+    async function saveSelectedLocationsBatch() {
+      const selectedLocations = getSelectedLocations();
+      if (selectedLocations.length === 0) return;
+
+      const saveButton = document.getElementById('save-batch-btn');
+      const status = document.getElementById('batch-status-select').value;
+      const assignedArea = document.getElementById('batch-assigned-area-select')?.value || null;
+
+      if (status === 'bad') {
+        if (!assignedArea) {
+          window.alert('אם המיקומים לא תקינים צריך לבחור אזור חדש.');
+          return;
+        }
+        const invalidOriginals = selectedLocations.filter(loc => loc.area === assignedArea);
+        if (invalidOriginals.length > 0) {
+          window.alert('האזור החדש חייב להיות שונה מהאזור המקורי של כל המיקומים שנבחרו.');
+          return;
+        }
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = 'שומר...';
+
+      try {
+        if (isLocalJsonMode()) {
+          const selectedNames = new Set(state.selectedLocationNames);
+          state.locations = state.locations.map((entry) => (
+            selectedNames.has(entry.name)
+              ? applyLocationUpdate(entry, status, assignedArea)
+              : entry
+          ));
+        } else {
+          for (const loc of selectedLocations) {
+            const response = await fetch(`/api/locations/${encodeURIComponent(loc.name)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                status,
+                assigned_area: status === 'bad' ? assignedArea : null
+              })
+            });
+
+            if (!response.ok) {
+              const errorPayload = await response.json().catch(() => ({}));
+              throw new Error(`${loc.name}: ${errorPayload.error || 'שמירה נכשלה'}`);
+            }
+
+            const updatedLocation = await response.json();
+            state.locations = state.locations.map(entry => entry.name === updatedLocation.name ? updatedLocation : entry);
+          }
+        }
+
+        clearMultiSelection();
+        renderAll();
+      } catch (error) {
+        console.error('Failed to save batch location state:', error);
+        window.alert(error.message || 'שמירה קבוצתית נכשלה');
+      } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'שמור לכל הנבחרים';
+      }
+    }
+
     async function loadLocations() {
       const response = await fetch('/api/locations');
       if (!response.ok) throw new Error('Failed to load locations');
@@ -975,6 +1228,10 @@
     document.getElementById('toggle-area-labels').addEventListener('change', (event) => {
       state.showAreaLabels = event.target.checked;
       updateAreaLabels();
+    });
+
+    document.getElementById('toggle-multi-select').addEventListener('change', (event) => {
+      setMultiSelectMode(event.target.checked);
     });
 
     document.getElementById('show-all-areas').addEventListener('click', () => {
