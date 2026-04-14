@@ -6,10 +6,16 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+try:
+    import psycopg
+except ImportError:  # pragma: no cover - dependency is installed in production
+    psycopg = None
+
 
 BASE_DIR = Path(__file__).resolve().parent
 PORT = int(os.environ.get("PORT", 8080))
 DB_PATH = Path(os.environ.get("MAP_TRACKING_DB_PATH", BASE_DIR / "map_tracking.db"))
+DATABASE_URL = os.environ.get("DATABASE_URL")
 LOCATIONS_PATH = BASE_DIR / "locations.json"
 ALLOWED_STATUSES = {"unreviewed", "ok", "bad"}
 
@@ -29,15 +35,41 @@ BASE_LOCATION_BY_NAME = {loc["name"]: loc for loc in BASE_LOCATIONS}
 AREA_NAMES = sorted({loc["area"] for loc in BASE_LOCATIONS})
 
 
-def get_db():
+def using_postgres():
+    return bool(DATABASE_URL)
+
+
+def get_sqlite_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db():
+def get_postgres_db():
+    if psycopg is None:
+        raise RuntimeError("DATABASE_URL is set but psycopg is not installed.")
+    return psycopg.connect(DATABASE_URL)
+
+
+def init_postgres():
+    with get_postgres_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS location_reviews (
+                  name TEXT PRIMARY KEY,
+                  status TEXT NOT NULL DEFAULT 'unreviewed',
+                  assigned_area TEXT,
+                  updated_at TEXT NOT NULL
+                )
+                """
+            )
+        conn.commit()
+
+
+def init_sqlite():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with get_db() as conn:
+    with get_sqlite_db() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS location_reviews (
@@ -50,13 +82,73 @@ def init_db():
         )
 
 
-def merge_locations():
-    with get_db() as conn:
+def init_db():
+    if using_postgres():
+        init_postgres()
+    else:
+        init_sqlite()
+
+
+def fetch_reviews():
+    if using_postgres():
+        with get_postgres_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT name, status, assigned_area, updated_at FROM location_reviews"
+                )
+                rows = cur.fetchall()
+        return [
+            {
+                "name": row[0],
+                "status": row[1],
+                "assigned_area": row[2],
+                "updated_at": row[3],
+            }
+            for row in rows
+        ]
+
+    with get_sqlite_db() as conn:
         rows = conn.execute(
             "SELECT name, status, assigned_area, updated_at FROM location_reviews"
         ).fetchall()
 
-    reviews = {row["name"]: dict(row) for row in rows}
+    return [dict(row) for row in rows]
+
+
+def save_review(name, status, assigned_area, updated_at):
+    if using_postgres():
+        with get_postgres_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO location_reviews (name, status, assigned_area, updated_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT(name) DO UPDATE SET
+                      status = EXCLUDED.status,
+                      assigned_area = EXCLUDED.assigned_area,
+                      updated_at = EXCLUDED.updated_at
+                    """,
+                    (name, status, assigned_area, updated_at),
+                )
+            conn.commit()
+        return
+
+    with get_sqlite_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO location_reviews (name, status, assigned_area, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+              status = excluded.status,
+              assigned_area = excluded.assigned_area,
+              updated_at = excluded.updated_at
+            """,
+            (name, status, assigned_area, updated_at),
+        )
+
+
+def merge_locations():
+    reviews = {row["name"]: row for row in fetch_reviews()}
     merged = []
     for loc in BASE_LOCATIONS:
         review = reviews.get(loc["name"], {})
@@ -139,18 +231,7 @@ class AppHandler(SimpleHTTPRequestHandler):
             assigned_area = None
 
         updated_at = utc_now()
-        with get_db() as conn:
-            conn.execute(
-                """
-                INSERT INTO location_reviews (name, status, assigned_area, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(name) DO UPDATE SET
-                  status = excluded.status,
-                  assigned_area = excluded.assigned_area,
-                  updated_at = excluded.updated_at
-                """,
-                (name, status, assigned_area, updated_at),
-            )
+        save_review(name, status, assigned_area, updated_at)
 
         loc = BASE_LOCATION_BY_NAME[name]
         return self.end_json(
@@ -171,5 +252,6 @@ class AppHandler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     init_db()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), AppHandler)
-    print(f"Serving on port {PORT} with DB at {DB_PATH}")
+    storage_target = "Postgres" if using_postgres() else str(DB_PATH)
+    print(f"Serving on port {PORT} with DB at {storage_target}")
     server.serve_forever()
