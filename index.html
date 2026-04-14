@@ -256,6 +256,14 @@
       cursor: pointer;
     }
     .history-restore-btn:hover { background: rgba(255,255,255,0.12); }
+    .snapshot-item {
+      font-size: 11px;
+      padding: 7px 8px;
+      margin-top: 6px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+      line-height: 1.5;
+    }
     .status-hint { font-size: 11px; color: #8ea2b8; margin-top: 6px; line-height: 1.4; }
     .share-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -411,8 +419,13 @@
           <button id="import-json-btn" class="action-btn">טעינת JSON</button>
           <button id="reset-production-btn" class="action-btn secondary" style="grid-column:1 / -1;">חזרה לנתוני השרת</button>
         </div>
+        <div class="action-group" style="margin-top:10px;">
+          <button id="save-current-snapshot-btn" class="action-btn secondary">שמור גרסה נוכחית</button>
+          <button id="restore-previous-snapshot-btn" class="action-btn secondary">שחזר לגרסה אחת אחורה</button>
+        </div>
         <input type="file" id="import-json-file" accept="application/json,.json" hidden>
         <div class="status-hint">טעינת JSON מחליפה את הנתונים רק בדפדפן הנוכחי. במצב זה לא מתבצעת שום כתיבה לנתוני הייצור.</div>
+        <div id="snapshot-list" class="review-empty" style="margin-top:10px;">טוען גרסאות DB...</div>
       </div>
 
       <div class="panel" id="review-panel">
@@ -478,6 +491,7 @@
       productionLocations: [],
       productionAreas: [],
       history: [],
+      snapshots: [],
       selectedLocationName: null,
       selectedLocationNames: [],
       areaState: {},
@@ -619,7 +633,8 @@
         source_mode: state.dataMode,
         areas: [...state.areas],
         locations: state.locations.map(cloneLocation),
-        history: [...state.history]
+        history: [...state.history],
+        snapshots: [...state.snapshots]
       };
     }
 
@@ -1182,6 +1197,24 @@
       });
     }
 
+    function renderSnapshotList() {
+      const container = document.getElementById('snapshot-list');
+      if (!state.snapshots.length) {
+        container.className = 'review-empty';
+        container.textContent = 'עדיין אין גרסאות שמורות ב-DB.';
+        return;
+      }
+
+      container.className = '';
+      container.innerHTML = state.snapshots.map((snapshot, index) => `
+        <div class="snapshot-item">
+          <div><strong>${index === 0 ? 'גרסה אחרונה' : `גרסה ${state.snapshots.length - index}`}</strong></div>
+          <div>${escapeHtml(snapshot.created_at || '')}</div>
+          ${snapshot.label ? `<div>${escapeHtml(snapshot.label)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
     function renderReviewPanel() {
       const container = document.getElementById('review-content');
       const loc = state.locations.find(entry => entry.name === state.selectedLocationName);
@@ -1349,6 +1382,7 @@
       renderLegend();
       renderInvalidList();
       renderHistoryList();
+      renderSnapshotList();
       renderReviewPanel();
       renderDataModeBanner();
     }
@@ -1445,6 +1479,9 @@
         refreshHistory().catch((error) => {
           console.error('Failed to refresh history after save:', error);
         });
+        refreshSnapshots().catch((error) => {
+          console.error('Failed to refresh snapshots after save:', error);
+        });
         selectLocation(updatedLocation.name, false);
       } catch (error) {
         console.error('Failed to save location state:', error);
@@ -1512,6 +1549,9 @@
         refreshHistory().catch((error) => {
           console.error('Failed to refresh history after batch save:', error);
         });
+        refreshSnapshots().catch((error) => {
+          console.error('Failed to refresh snapshots after batch save:', error);
+        });
       } catch (error) {
         console.error('Failed to save batch location state:', error);
         window.alert(error.message || 'שמירה קבוצתית נכשלה');
@@ -1533,10 +1573,52 @@
       return response.json();
     }
 
+    async function loadSnapshots() {
+      const response = await fetch('/api/snapshots');
+      if (!response.ok) throw new Error('Failed to load snapshots');
+      return response.json();
+    }
+
     async function refreshHistory() {
       const payload = await loadHistory();
       state.history = payload.history || [];
       renderHistoryList();
+    }
+
+    async function refreshSnapshots() {
+      const payload = await loadSnapshots();
+      state.snapshots = payload.snapshots || [];
+      renderSnapshotList();
+    }
+
+    async function saveCurrentSnapshot() {
+      const response = await fetch('/api/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: `manual-${new Date().toISOString()}` })
+      });
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload.error || 'שמירת גרסה נכשלה');
+      }
+      const payload = await response.json();
+      state.snapshots = payload.snapshots || [];
+      renderSnapshotList();
+    }
+
+    async function restorePreviousSnapshot() {
+      const response = await fetch('/api/snapshots/restore-previous', {
+        method: 'POST'
+      });
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload.error || 'שחזור גרסה קודמת נכשל');
+      }
+      const payload = await response.json();
+      state.locations = payload.locations || state.locations;
+      state.history = payload.history || [];
+      state.snapshots = payload.snapshots || [];
+      renderAll();
     }
 
     async function restoreHistoryEntry(historyId) {
@@ -1646,6 +1728,18 @@
     });
 
     document.getElementById('export-excel-btn').addEventListener('click', exportExcel);
+    document.getElementById('save-current-snapshot-btn').addEventListener('click', () => {
+      saveCurrentSnapshot().catch((error) => {
+        console.error('Failed to save current snapshot:', error);
+        window.alert(error.message || 'שמירת גרסה נכשלה');
+      });
+    });
+    document.getElementById('restore-previous-snapshot-btn').addEventListener('click', () => {
+      restorePreviousSnapshot().catch((error) => {
+        console.error('Failed to restore previous snapshot:', error);
+        window.alert(error.message || 'שחזור גרסה קודמת נכשל');
+      });
+    });
 
     document.getElementById('import-json-btn').addEventListener('click', () => {
       document.getElementById('import-json-file').click();
@@ -1670,13 +1764,14 @@
           [...state.productionAreas]
         );
         renderAll({ fitBounds: true });
-        return refreshHistory();
+        return Promise.all([refreshHistory(), refreshSnapshots()]);
       })
       .catch((error) => {
         console.error('Failed to load app data:', error);
         document.getElementById('review-content').textContent = 'שגיאה בטעינת הנתונים.';
         document.getElementById('invalid-list').innerHTML = '<div class="invalid-empty">שגיאה בטעינת הנתונים.</div>';
         document.getElementById('history-list').innerHTML = '<div class="invalid-empty">שגיאה בטעינת ההיסטוריה.</div>';
+        document.getElementById('snapshot-list').innerHTML = '<div class="invalid-empty">שגיאה בטעינת הגרסאות.</div>';
       });
   </script>
 </body>
