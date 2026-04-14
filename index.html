@@ -382,6 +382,7 @@
         <div id="data-mode-banner" class="mode-banner production"></div>
         <div class="action-group" style="margin-top:10px;">
           <button id="export-json-btn" class="action-btn">ייצוא JSON</button>
+          <button id="export-excel-btn" class="action-btn">ייצוא Excel</button>
           <button id="import-json-btn" class="action-btn">טעינת JSON</button>
           <button id="reset-production-btn" class="action-btn secondary" style="grid-column:1 / -1;">חזרה לנתוני השרת</button>
         </div>
@@ -416,6 +417,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="area_boundaries.js"></script>
   <script>
     const AREA_COLORS = {
@@ -583,6 +585,53 @@
         areas: [...state.areas],
         locations: state.locations.map(cloneLocation)
       };
+    }
+
+    function buildExcelRows(locations) {
+      return locations
+        .slice()
+        .sort((a, b) => {
+          const areaCompare = getEffectiveArea(a).localeCompare(getEffectiveArea(b), 'he');
+          if (areaCompare !== 0) return areaCompare;
+          return a.name.localeCompare(b.name, 'he');
+        })
+        .map((loc) => ({
+          'אזור מוצג': getEffectiveArea(loc),
+          'אזור מקור': loc.area,
+          'שם מיקום': loc.name,
+          'סטטוס': getStatusText(loc.status),
+          'אזור משויך מחדש': loc.assigned_area || '',
+          'קו רוחב': loc.lat,
+          'קו אורך': loc.lon,
+          'עודכן בתאריך': loc.updated_at || ''
+        }));
+    }
+
+    function sanitizeSheetName(name) {
+      return name.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet';
+    }
+
+    function exportExcel() {
+      if (typeof XLSX === 'undefined') {
+        window.alert('ייצוא Excel לא זמין כרגע.');
+        return;
+      }
+
+      const workbook = XLSX.utils.book_new();
+      const exportRows = buildExcelRows(state.locations);
+      const allSheet = XLSX.utils.json_to_sheet(exportRows);
+      XLSX.utils.book_append_sheet(workbook, allSheet, 'כל המיקומים');
+
+      const byArea = groupByArea(state.locations);
+      Object.entries(byArea)
+        .sort(([areaA], [areaB]) => areaA.localeCompare(areaB, 'he'))
+        .forEach(([area, areaLocs]) => {
+          const sheet = XLSX.utils.json_to_sheet(buildExcelRows(areaLocs));
+          XLSX.utils.book_append_sheet(workbook, sheet, sanitizeSheetName(area));
+        });
+
+      const timestamp = new Date().toISOString().replaceAll(':', '-');
+      XLSX.writeFile(workbook, `map-tracking-${state.dataMode}-${timestamp}.xlsx`);
     }
 
     function downloadJson(filename, payload) {
@@ -1485,6 +1534,8 @@
       const timestamp = new Date().toISOString().replaceAll(':', '-');
       downloadJson(`map-tracking-${state.dataMode}-${timestamp}.json`, buildExportPayload());
     });
+
+    document.getElementById('export-excel-btn').addEventListener('click', exportExcel);
 
     document.getElementById('import-json-btn').addEventListener('click', () => {
       document.getElementById('import-json-file').click();
