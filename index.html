@@ -47,6 +47,46 @@
     }
     .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1 1 140px; }
     .toggle-row input[type="checkbox"] { accent-color: #e94560; }
+    .action-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .action-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid #294264; background: #1a1a2e; color: #eee;
+      font-size: 13px; font-weight: bold; cursor: pointer;
+    }
+    .action-btn:hover { background: #22304c; }
+    .action-btn.secondary {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.16);
+      color: #d7dee8;
+    }
+    .action-btn.secondary:hover { background: rgba(255,255,255,0.12); }
+    .action-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .mode-banner {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .mode-banner.local {
+      background: rgba(255, 193, 7, 0.13);
+      border-color: rgba(255, 193, 7, 0.38);
+      color: #ffe38a;
+    }
+    .mode-banner.production {
+      color: #cfd8e3;
+    }
+    .mode-banner strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #fff;
+    }
     .legend-item {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       padding: 7px 0; font-size: 12px; cursor: pointer; transition: opacity 0.2s;
@@ -177,6 +217,7 @@
       .stat-val { font-size: 18px; }
       .stat-label { font-size: 10px; }
       .search-box, .form-select, .save-btn, .share-btn { font-size: 16px; }
+      .action-group { grid-template-columns: 1fr; }
       .toggle-row { padding: 10px; }
       .toggle-row label { flex-basis: 100%; }
       .legend-item {
@@ -238,6 +279,18 @@
         <label><input type="checkbox" id="toggle-area-labels" checked> שמות אזורים</label>
       </div>
 
+      <div class="panel">
+        <h3>JSON גיבוי וטעינה</h3>
+        <div id="data-mode-banner" class="mode-banner production"></div>
+        <div class="action-group" style="margin-top:10px;">
+          <button id="export-json-btn" class="action-btn">ייצוא JSON</button>
+          <button id="import-json-btn" class="action-btn">טעינת JSON</button>
+          <button id="reset-production-btn" class="action-btn secondary" style="grid-column:1 / -1;">חזרה לנתוני השרת</button>
+        </div>
+        <input type="file" id="import-json-file" accept="application/json,.json" hidden>
+        <div class="status-hint">טעינת JSON מחליפה את הנתונים רק בדפדפן הנוכחי. במצב זה לא מתבצעת שום כתיבה לנתוני הייצור.</div>
+      </div>
+
       <div class="panel" id="review-panel">
         <h3>עדכון מיקום</h3>
         <div id="review-content" class="review-empty">לחץ על נקודה במפה כדי לעדכן סטטוס ולשייך אזור במידת הצורך.</div>
@@ -292,13 +345,17 @@
     const state = {
       locations: [],
       areas: [],
+      productionLocations: [],
+      productionAreas: [],
       selectedLocationName: null,
       areaState: {},
       allMarkers: [],
       markerByName: {},
       showLocationLabels: false,
       showAreaLabels: true,
-      searchQuery: ''
+      searchQuery: '',
+      dataMode: 'production',
+      importedFileName: null
     };
 
     function escapeHtml(value) {
@@ -328,6 +385,124 @@
 
     function getStatusText(status) {
       return STATUS_LABELS[status] || STATUS_LABELS.unreviewed;
+    }
+
+    function isLocalJsonMode() {
+      return state.dataMode === 'json';
+    }
+
+    function setLocations(locations, areas, { preserveSelection = true } = {}) {
+      state.locations = locations;
+      state.areas = areas;
+      if (preserveSelection && state.selectedLocationName && state.locations.some(entry => entry.name === state.selectedLocationName)) {
+        return;
+      }
+      state.selectedLocationName = null;
+    }
+
+    function cloneLocation(loc) {
+      return {
+        name: loc.name,
+        area: loc.area,
+        lat: Number(loc.lat),
+        lon: Number(loc.lon),
+        status: loc.status || 'unreviewed',
+        assigned_area: loc.assigned_area || null,
+        effective_area: loc.effective_area || (loc.status === 'bad' && loc.assigned_area ? loc.assigned_area : loc.area),
+        updated_at: loc.updated_at || null
+      };
+    }
+
+    function buildExportPayload() {
+      return {
+        exported_at: new Date().toISOString(),
+        source_mode: state.dataMode,
+        areas: [...state.areas],
+        locations: state.locations.map(cloneLocation)
+      };
+    }
+
+    function downloadJson(filename, payload) {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function normalizeImportedPayload(payload) {
+      if (!payload || typeof payload !== 'object' || !Array.isArray(payload.locations)) {
+        throw new Error('קובץ ה-JSON חייב לכלול מערך locations.');
+      }
+
+      const areaSet = new Set(Array.isArray(payload.areas) ? payload.areas.filter(area => typeof area === 'string' && area.trim()) : []);
+      const normalizedLocations = payload.locations.map((loc, index) => {
+        if (!loc || typeof loc !== 'object') {
+          throw new Error(`רשומת מיקום מספר ${index + 1} אינה תקינה.`);
+        }
+
+        const name = typeof loc.name === 'string' ? loc.name.trim() : '';
+        const area = typeof loc.area === 'string' ? loc.area.trim() : '';
+        const lat = Number(loc.lat);
+        const lon = Number(loc.lon);
+        const status = typeof loc.status === 'string' ? loc.status : 'unreviewed';
+        const assignedArea = typeof loc.assigned_area === 'string' && loc.assigned_area.trim() ? loc.assigned_area.trim() : null;
+
+        if (!name || !area || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+          throw new Error(`רשומת המיקום "${name || index + 1}" חסרה או לא תקינה.`);
+        }
+
+        if (!Object.prototype.hasOwnProperty.call(STATUS_LABELS, status)) {
+          throw new Error(`למיקום "${name}" יש סטטוס לא חוקי.`);
+        }
+
+        if (status === 'bad' && (!assignedArea || assignedArea === area)) {
+          throw new Error(`למיקום "${name}" חייב להיות assigned_area תקין ושונה מהאזור המקורי.`);
+        }
+
+        areaSet.add(area);
+        if (assignedArea) areaSet.add(assignedArea);
+
+        return {
+          name,
+          area,
+          lat,
+          lon,
+          status,
+          assigned_area: status === 'bad' ? assignedArea : null,
+          effective_area: status === 'bad' && assignedArea ? assignedArea : area,
+          updated_at: typeof loc.updated_at === 'string' ? loc.updated_at : null
+        };
+      });
+
+      return {
+        areas: Array.from(areaSet).sort((a, b) => a.localeCompare(b, 'he')),
+        locations: normalizedLocations
+      };
+    }
+
+    function renderDataModeBanner() {
+      const banner = document.getElementById('data-mode-banner');
+      const resetButton = document.getElementById('reset-production-btn');
+      if (isLocalJsonMode()) {
+        banner.className = 'mode-banner local';
+        banner.innerHTML = `
+          <strong>מצב JSON מקומי</strong>
+          הנתונים נטענו מקובץ ${escapeHtml(state.importedFileName || 'מקומי')} ונשארים רק בדפדפן. שמירה במצב זה אינה נוגעת בשרת הייצור.
+        `;
+        resetButton.disabled = false;
+      } else {
+        banner.className = 'mode-banner production';
+        banner.innerHTML = `
+          <strong>מצב שרת ייצור</strong>
+          המפה מציגה את הנתונים החיים מהשרת. אפשר לייצא צילום מצב ל-JSON או לטעון JSON לעבודה מקומית בלבד.
+        `;
+        resetButton.disabled = state.productionLocations.length === 0;
+      }
     }
 
     function groupByArea(locations) {
@@ -662,6 +837,7 @@
       renderLegend();
       renderInvalidList();
       renderReviewPanel();
+      renderDataModeBanner();
     }
 
     function selectLocation(name, focusMap = false) {
@@ -704,6 +880,20 @@
       saveButton.textContent = 'שומר...';
 
       try {
+        if (isLocalJsonMode()) {
+          const updatedLocation = {
+            ...loc,
+            status,
+            assigned_area: status === 'bad' ? assignedArea : null,
+            effective_area: status === 'bad' ? assignedArea : loc.area,
+            updated_at: new Date().toISOString()
+          };
+          state.locations = state.locations.map(entry => entry.name === updatedLocation.name ? updatedLocation : entry);
+          renderAll();
+          selectLocation(updatedLocation.name, false);
+          return;
+        }
+
         const response = await fetch(`/api/locations/${encodeURIComponent(loc.name)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -735,6 +925,41 @@
       const response = await fetch('/api/locations');
       if (!response.ok) throw new Error('Failed to load locations');
       return response.json();
+    }
+
+    async function restoreProductionData({ fitBounds = false } = {}) {
+      if (state.productionLocations.length === 0) {
+        const payload = await loadLocations();
+        state.productionLocations = payload.locations.map(cloneLocation);
+        state.productionAreas = [...payload.areas];
+      }
+
+      state.dataMode = 'production';
+      state.importedFileName = null;
+      setLocations(
+        state.productionLocations.map(cloneLocation),
+        [...state.productionAreas]
+      );
+      renderAll({ fitBounds });
+    }
+
+    async function handleImportFile(event) {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      try {
+        const raw = await file.text();
+        const payload = JSON.parse(raw);
+        const normalized = normalizeImportedPayload(payload);
+        state.dataMode = 'json';
+        state.importedFileName = file.name;
+        setLocations(normalized.locations, normalized.areas);
+        renderAll({ fitBounds: true });
+      } catch (error) {
+        console.error('Failed to import JSON data:', error);
+        window.alert(error.message || 'טעינת קובץ ה-JSON נכשלה.');
+      }
     }
 
     document.getElementById('search').addEventListener('input', (event) => {
@@ -773,10 +998,32 @@
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     });
 
+    document.getElementById('export-json-btn').addEventListener('click', () => {
+      const timestamp = new Date().toISOString().replaceAll(':', '-');
+      downloadJson(`map-tracking-${state.dataMode}-${timestamp}.json`, buildExportPayload());
+    });
+
+    document.getElementById('import-json-btn').addEventListener('click', () => {
+      document.getElementById('import-json-file').click();
+    });
+
+    document.getElementById('import-json-file').addEventListener('change', handleImportFile);
+
+    document.getElementById('reset-production-btn').addEventListener('click', () => {
+      restoreProductionData({ fitBounds: true }).catch((error) => {
+        console.error('Failed to restore production data:', error);
+        window.alert('חזרה לנתוני השרת נכשלה.');
+      });
+    });
+
     loadLocations()
       .then((payload) => {
-        state.locations = payload.locations;
-        state.areas = payload.areas;
+        state.productionLocations = payload.locations.map(cloneLocation);
+        state.productionAreas = [...payload.areas];
+        setLocations(
+          state.productionLocations.map(cloneLocation),
+          [...state.productionAreas]
+        );
         renderAll({ fitBounds: true });
       })
       .catch((error) => {
