@@ -996,10 +996,10 @@
 
       for (const [area, areaLocs] of Object.entries(byArea)) {
         const color = getColor(area);
-        const boundary = getBoundary(area);
+        const boundary = getBoundary(area) || buildAreaOutline(areaLocs);
         const areaState = { visible: true, markers: [], labels: [], polygon: null, areaLabel: null };
 
-        if (boundary) {
+        if (boundary && boundary.length >= 3) {
           const polygon = L.polygon(boundary, {
             color,
             fillColor: color,
