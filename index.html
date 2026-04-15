@@ -777,11 +777,12 @@
           || loc.area.toLowerCase().includes(query);
         const matchesStatus = matchesStatusFilter(loc);
         const isSelected = isLocationSelected(loc.name);
+        const areaColor = getColor(getEffectiveArea(loc));
         marker.setStyle({
           opacity: matches && matchesStatus ? 1 : 0.08,
           fillOpacity: matches && matchesStatus ? (loc.status === 'unreviewed' ? 0.58 : 0.85) : 0.08,
-          weight: isSelected ? 4 : (loc.status === 'bad' ? 3 : 1),
-          color: isSelected ? '#ffffff' : (loc.status === 'bad' ? '#fff' : getColor(getEffectiveArea(loc))),
+          weight: isSelected ? 4 : (loc.status === 'bad' ? 2 : 1),
+          color: isSelected ? '#ffffff' : areaColor,
           radius: isSelected ? 9 : (loc.status === 'bad' ? 7 : 5)
         });
         const markerElement = marker.getElement();
@@ -1004,8 +1005,8 @@
         for (const loc of areaLocs) {
           const radius = loc.status === 'bad' ? 7 : 5;
           const fillOpacity = loc.status === 'unreviewed' ? 0.58 : 0.85;
-          const weight = loc.status === 'bad' ? 3 : 1;
-          const strokeColor = loc.status === 'bad' ? '#fff' : color;
+          const weight = loc.status === 'bad' ? 2 : 1;
+          const strokeColor = color;
 
           const marker = L.circleMarker([loc.lat, loc.lon], {
             radius,
