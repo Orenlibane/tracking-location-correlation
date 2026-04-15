@@ -436,7 +436,7 @@
       <div class="panel">
         <h3>אזורים</h3>
         <div class="legend-controls">
-          <button id="toggle-all-areas">הסתר את כל האזורים</button>
+          <button id="toggle-all-areas">הסתר את מיפוי כל האזורים</button>
         </div>
         <div id="legend-items"></div>
       </div>
@@ -503,6 +503,7 @@
       importedFileName: null,
       multiSelectMode: false,
       statusFilter: 'all',
+      showAllAreaBoundaries: true,
       highlightedAreas: [],
       highlightedAreaLayers: {},
       areaColors: { ...AREA_COLORS }
@@ -906,15 +907,10 @@
       });
     }
 
-    function areAllAreasVisible() {
-      const areaStates = Object.values(state.areaState);
-      return areaStates.length > 0 && areaStates.every((entry) => entry.visible);
-    }
-
     function updateAreaToggleButton() {
       const button = document.getElementById('toggle-all-areas');
       if (!button) return;
-      button.textContent = areAllAreasVisible() ? 'הסתר את כל האזורים' : 'הצג את כל האזורים';
+      button.textContent = state.showAllAreaBoundaries ? 'הסתר את מיפוי כל האזורים' : 'הצג את מיפוי כל האזורים';
     }
 
     function groupByArea(locations) {
@@ -953,12 +949,20 @@
       }
     }
 
+    function updateAreaBoundaryVisibility() {
+      for (const areaState of Object.values(state.areaState)) {
+        if (!areaState.polygon) continue;
+        if (areaState.visible && state.showAllAreaBoundaries) areaState.polygon.addTo(map);
+        else map.removeLayer(areaState.polygon);
+      }
+    }
+
     function toggleArea(area, visible) {
       const areaState = state.areaState[area];
       if (!areaState) return;
       areaState.visible = visible;
       if (visible) {
-        if (areaState.polygon) areaState.polygon.addTo(map);
+        if (areaState.polygon && state.showAllAreaBoundaries) areaState.polygon.addTo(map);
         areaState.markers.forEach(entry => entry.marker.addTo(map));
         if (state.showLocationLabels) areaState.labels.forEach(label => label.addTo(map));
         if (state.showAreaLabels && areaState.areaLabel) areaState.areaLabel.addTo(map);
@@ -1049,6 +1053,7 @@
 
       updateLocationLabels();
       updateAreaLabels();
+      updateAreaBoundaryVisibility();
       updateMarkerStyles();
       const highlightedAreas = [...state.highlightedAreas];
       state.highlightedAreas = [];
@@ -1714,12 +1719,8 @@
     });
 
     document.getElementById('toggle-all-areas').addEventListener('click', () => {
-      const shouldShow = !areAllAreasVisible();
-      document.querySelectorAll('.legend-checkbox').forEach(checkbox => {
-        checkbox.classList.toggle('checked', shouldShow);
-        checkbox.closest('.legend-item').classList.toggle('hidden-area', !shouldShow);
-      });
-      Object.keys(state.areaState).forEach(area => toggleArea(area, shouldShow));
+      state.showAllAreaBoundaries = !state.showAllAreaBoundaries;
+      updateAreaBoundaryVisibility();
       updateAreaToggleButton();
     });
 
