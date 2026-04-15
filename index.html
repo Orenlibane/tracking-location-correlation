@@ -436,8 +436,7 @@
       <div class="panel">
         <h3>אזורים</h3>
         <div class="legend-controls">
-          <button id="show-all-areas">הצג הכל</button>
-          <button id="hide-all-areas">הסתר הכל</button>
+          <button id="toggle-all-areas">הסתר את כל האזורים</button>
         </div>
         <div id="legend-items"></div>
       </div>
@@ -905,6 +904,17 @@
       document.querySelectorAll('[data-status-filter-button]').forEach((element) => {
         element.classList.toggle('active', element.dataset.statusFilterButton === state.statusFilter);
       });
+    }
+
+    function areAllAreasVisible() {
+      const areaStates = Object.values(state.areaState);
+      return areaStates.length > 0 && areaStates.every((entry) => entry.visible);
+    }
+
+    function updateAreaToggleButton() {
+      const button = document.getElementById('toggle-all-areas');
+      if (!button) return;
+      button.textContent = areAllAreasVisible() ? 'הסתר את כל האזורים' : 'הצג את כל האזורים';
     }
 
     function groupByArea(locations) {
@@ -1386,6 +1396,7 @@
       renderSnapshotList();
       renderReviewPanel();
       renderDataModeBanner();
+      updateAreaToggleButton();
     }
 
     function selectLocation(name, focusMap = false) {
@@ -1702,20 +1713,14 @@
       });
     });
 
-    document.getElementById('show-all-areas').addEventListener('click', () => {
+    document.getElementById('toggle-all-areas').addEventListener('click', () => {
+      const shouldShow = !areAllAreasVisible();
       document.querySelectorAll('.legend-checkbox').forEach(checkbox => {
-        checkbox.classList.add('checked');
-        checkbox.closest('.legend-item').classList.remove('hidden-area');
+        checkbox.classList.toggle('checked', shouldShow);
+        checkbox.closest('.legend-item').classList.toggle('hidden-area', !shouldShow);
       });
-      Object.keys(state.areaState).forEach(area => toggleArea(area, true));
-    });
-
-    document.getElementById('hide-all-areas').addEventListener('click', () => {
-      document.querySelectorAll('.legend-checkbox').forEach(checkbox => {
-        checkbox.classList.remove('checked');
-        checkbox.closest('.legend-item').classList.add('hidden-area');
-      });
-      Object.keys(state.areaState).forEach(area => toggleArea(area, false));
+      Object.keys(state.areaState).forEach(area => toggleArea(area, shouldShow));
+      updateAreaToggleButton();
     });
 
     document.getElementById('share-whatsapp').addEventListener('click', () => {
